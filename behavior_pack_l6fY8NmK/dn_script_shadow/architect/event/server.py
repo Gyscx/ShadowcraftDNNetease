@@ -1,15 +1,4 @@
-from .core import EventChain, ChainedEvent
-from ..component.core import _registerComponent, BaseCompServer
-
-
-class EventReader(BaseCompServer):
-    def onCreate(self, _):
-        self.ev = None
-
-    def event(self):
-        # type: () -> ChainedEvent
-        return self.ev
-_registerComponent(True, EventReader, False, True)
+from .core import EventChain
 
 
 class ServerEvents:
@@ -23,7 +12,7 @@ class ServerEvents:
         else:
             chain = EventChain()
             ServerEvents.globalEvents[(eventType, isCustomEvent)] = chain
-            from ..subsystem import SubsystemManager
+            from ..core.subsystem import SubsystemManager
             SubsystemManager.getInstance().addListener(eventType, lambda ev: chain.dispatch(eventType, ev), isCustomEvent)
             return chain
 

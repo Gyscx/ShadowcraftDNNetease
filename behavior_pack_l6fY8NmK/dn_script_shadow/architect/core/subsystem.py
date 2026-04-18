@@ -3,15 +3,15 @@ import time
 import mod.client.extraClientApi as clientApi
 import mod.server.extraServerApi as serverApi
 
-from .basic import isServer, Location
-from .component.core import _registerCompsIntoGame, getOrCreateSingletonComponent
-from .event.client import event as eventClient
-from .event.server import event as eventServer
 from .annotation import AnnotationHelper
 from .scheduler import Scheduler, Sched, SimpleFixedScheduler
-from .conf import EVENT_LISTENER, CUSTOM_EVENT, SYSTEM_SCHED_ANNO, SCHED_EVENT
+from .basic import isServer, Location
+from .loader import __dirname__, _loadPlugins, _notifyAddSubsystem, _notifyRemoveSubsystem
 
-from .loader import __dirname__
+from ..component.core import _registerCompsIntoGame, getOrCreateSingletonComponent
+from ..event.client import event as eventClient
+from ..event.server import event as eventServer
+from ..conf import EVENT_LISTENER, CUSTOM_EVENT, SYSTEM_SCHED_ANNO, SCHED_EVENT
 
 
 SYSTEM_CLIENT_NAME = '_ShadowSystemClient'
@@ -62,6 +62,8 @@ class SubsystemManager:
         manager.rawEngine = clientApi.GetEngineNamespace()
         manager.rawSysName = clientApi.GetEngineSystemName()
         SubsystemManager.client = manager
+        # 在manager之前初始化，否则无法监听组件注册和子系统变更
+        _loadPlugins(manager)
         manager._initManager(False)
         return manager
 
@@ -77,6 +79,8 @@ class SubsystemManager:
         manager.rawEngine = serverApi.GetEngineNamespace()
         manager.rawSysName = serverApi.GetEngineSystemName()
         SubsystemManager.server = manager
+        # 在manager之前初始化，否则无法监听组件注册和子系统变更
+        _loadPlugins(manager)
         manager._initManager(True)
         return manager
 
@@ -147,6 +151,7 @@ class SubsystemManager:
     def addSubsystem(self, subsystemCls):
         subSys = subsystemCls(self.system, self.engine, self.sysName)
         self.addSubsystemInst(subSys)
+        _notifyAddSubsystem(subSys)
         print('[INFO] {} Subsystem "{}" has been initialized'.format('Server' if isServer() else 'Client', subSys.__class__.__name__))
 
 
@@ -167,6 +172,7 @@ class SubsystemManager:
     def removeSubsystem(self, subsystemCls):
         subSystems = self.getSubsystems()
         subSys = subSystems[subsystemCls.__name__]
+        _notifyRemoveSubsystem(subSys)
         subSys._destroy()
 
 

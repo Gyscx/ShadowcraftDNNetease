@@ -1,9 +1,9 @@
 # 用于注册客户端子系统
-from ..architect.subsystem import ClientSubsystem, SubsystemClient
+from ..architect.comapct import ClientSubsystem, SubsystemClient
 # 用于注册事件监听器
-from ..architect.event import EventListener
+from ..architect.comapct import EventListener
 # 非常基础的组件，比如clientApi, serverApi
-from ..architect.basic import clientApi
+from ..architect.comapct import clientApi
 
 from .. import config
 

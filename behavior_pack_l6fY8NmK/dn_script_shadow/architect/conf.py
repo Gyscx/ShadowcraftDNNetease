@@ -13,7 +13,6 @@ PLUGINS = [
 ]
 
 # 改了也没什么意义的配置
-PLUGIN_NAME = '_plugin_name'                    # 插件名称
 ANNOTATION = '_annotation'                      # 装饰器标记
 COMPONENT_TAG = '_component'                    # 组件标记
 PERSIST_INFO = '_persist_keys'                  # 持久化键标记
