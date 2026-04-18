@@ -6,7 +6,6 @@ from .. import config
 
 from ..architect.subsystem import ServerSubsystem, SubsystemServer
 from ..architect.event import EventListener
-from ..architect.event.core import ChainedEvent
 
 SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
@@ -27,6 +26,7 @@ class ShadowServerSystem(ServerSubsystem):
     @EventListener(config.ServerSkillEvent, isCustomEvent=True)
     def OnSkillEvent(self, args):
         """服务端释放技能事件（使用命令）"""
+        print args
         skill_id = args.skill
         player_id = args.playerId
         # 新增：客户端可以传递具体的物品标识符
@@ -88,10 +88,13 @@ class ShadowServerSystem(ServerSubsystem):
         # 可以添加远程武器特有的逻辑
         pass
 
-    @EventListener(config.ClientItemTryUseEvent, isCustomEvent=True)
+    @EventListener(config.ClientUseShadowEnergyEvent, isCustomEvent=True)
     def OnClientUseShadowEnergy(self, args):
         """服务端玩家右键暗影能量物品事件"""
+        print "222"
+        # print args.dict()
         playerId = args.playerId
+        print playerId
         if not playerId:
             return
 
@@ -135,4 +138,3 @@ class ShadowServerSystem(ServerSubsystem):
         print "服务端-玩家已攻击"
         print args.dict()
         print playerId
-        self.sendClient(player_list, config.PlayerAttackEntityEvent, args.dict())
