@@ -1,0 +1,16 @@
+execute as @s at @s positioned ^ ^ ^8 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^7.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^7 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^6.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^6 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^5.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^4.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^4 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^3.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^3 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^2.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^2 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^1.5 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^1 run damage @e[r=3] 30 entity_attack entity @s
+execute as @s at @s positioned ^ ^ ^0.5 run damage @e[r=3] 30 entity_attack entity @s

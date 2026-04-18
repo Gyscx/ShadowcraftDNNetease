@@ -1,0 +1,51 @@
+{
+  "Source": "import",
+  "CreateVersion": "3.7.0.211586",
+  "EditVersion": "3.7.0.211586",
+  "OldEditCount": 0,
+  "NewEditCount": 20,
+  "OldComponents": [],
+  "Account": "gxc1250378829@163.com",
+  "UserName": "DN工作室",
+  "UserId": "153976",
+  "Id": "60f5117758dc4f189090dfb30c050ea3",
+  "EditType": 4,
+  "IsMap": false,
+  "CreateNew": true,
+  "CodeEnable": true,
+  "CanPublishResourceComponent": true,
+  "EditName": "shadow",
+  "GameType": 1,
+  "WorldType": 1,
+  "Seed": "",
+  "BlockNums": [
+    0,
+    0
+  ],
+  "BornPoint": [
+    0,
+    0,
+    0
+  ],
+  "SaveBackMapPath": null,
+  "SaveBackAddOnPath": "D:\\program\\shadow",
+  "ResourceIds": [
+    "4663992723979505306"
+  ],
+  "EditAddOnPaths": [],
+  "NameSpace": "dn_sss",
+  "EditMaterialPaths": [],
+  "EditLogFilePath": "D:\\MCStudioDownload\\work\\editor\\edit.log",
+  "ServerName": "EXPR",
+  "StudioPort": 9311,
+  "DCWebUrl": "https://x19apigatewayexpr.nie.netease.com",
+  "ShowGuide": false,
+  "AssertCacheDir": "D:\\MCStudioDownload\\EngineAssert",
+  "ElkUrl": "https://x19mclexpr.nie.netease.com/client-log",
+  "ShowGpuDriverTips": false,
+  "StudioTempPath": "D:\\MCStudioDownload\\temp\\editorTemp",
+  "EditorResourcePackPath": "D:\\MCStudio\\data\\inner_res",
+  "EditDate": 1773147847,
+  "EditDuration": 45698,
+  "TestDuration": 258108
+}

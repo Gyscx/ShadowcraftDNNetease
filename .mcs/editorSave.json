@@ -1,0 +1,44 @@
+{
+    "Addon": {
+        "EnchantSetting": {
+            "amplifier": 1
+        },
+        "PackResourceSortData": {
+
+        },
+        "PlayerEffectSetting": {
+            "amplifier": 1,
+            "duration": 10
+        },
+        "PresetInstanceTreeData": [
+
+        ]
+    },
+    "UI": {
+        "customPrefabGroupExpand": [
+
+        ],
+        "customVariables": {
+            "D:\\program\\shadow\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
+                "$shadow"
+            ]
+        },
+        "expandData": {
+            "prefab": {
+
+            },
+            "screen": {
+                "D:\\MCStudioDownload\\work\\gxc1250378829@163.com\\Cpp\\AddOn\\0332e5d62a8e4419858de530b67b963e\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
+                    "/main",
+                    "/main/shadowPanel"
+                ],
+                "D:\\program\\shadow\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
+                    "/main",
+                    "/main/shadowPanel",
+                    "/main/shadowPanel/progress_bar",
+                    "/main/shadowPanel/shadow_ability"
+                ]
+            }
+        }
+    }
+}

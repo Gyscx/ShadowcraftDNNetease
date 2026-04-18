@@ -1,0 +1,30 @@
+{
+    "format_version": 2,
+    "header": {
+        "description": "由DN工作室制作",
+        "name": "PLED",
+        "min_engine_version": [
+            1,
+            21,
+            50
+        ],
+        "uuid": "e7d56077-17de-43ee-9948-cb3d78133de9",
+        "version": [
+            0,
+            0,
+            1
+        ]
+    },
+    "modules": [
+        {
+            "description": "",
+            "type": "data",
+            "uuid": "2cc1349b-cec6-4a7d-8023-313eaaa08e55",
+            "version": [
+                0,
+                0,
+                1
+            ]
+        }
+    ]
+}

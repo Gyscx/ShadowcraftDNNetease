@@ -1,0 +1,12 @@
+{
+    "Arena.Component.Namespace": "dn_sss",
+    "FirstTabSetting": 1,
+    "ShortItemSettings": [
+        "resource_pack_5iay8wu8\\ui",
+        "resource_pack_5iay8wu8\\textures"
+    ],
+    "Uluru.autoLayerDict": {
+        "shadow_energy": true
+    },
+    "Uluru.checkSuspectOldUI": true
+}
