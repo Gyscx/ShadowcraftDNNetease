@@ -216,7 +216,7 @@ class ShadowClientSystem(ClientSubsystem):
     def OnClientItemTryUse(self, args):
         """客户端尝试使用物品时触发，处理暗影能量的使用与消耗"""
         itemDict = args.itemDict
-        if itemDict.get("itemName") != "sf:shadow_energy":
+        if itemDict.get("itemName") != "minecraft:stone_sword":
             return
         playerId = args.playerId  # 从事件参数获取玩家ID
         # 获取当前暗影能量数据

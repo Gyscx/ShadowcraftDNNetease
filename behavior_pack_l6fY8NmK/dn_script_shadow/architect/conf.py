@@ -4,7 +4,16 @@ DB_NAME = 'clientKVDb'                          # 数据库命名空间
 DB_GLOBAL_NAME = 'clientKVGlobal'               # 全局数据库命名空间
 UI_NAMESPACE = 'xxx_roninUi_xxx'                # UI命名空间
 
+# 插件列表
+# $vendor为系统插件，$user为用户插件
+# 系统插件在{modname}/architect/plugins目录下
+# 用户插件在{modname}/plugins目录下
+PLUGINS = [
+    '$vendor.event',        # 事件系统
+]
+
 # 改了也没什么意义的配置
+PLUGIN_NAME = '_plugin_name'                    # 插件名称
 ANNOTATION = '_annotation'                      # 装饰器标记
 COMPONENT_TAG = '_component'                    # 组件标记
 PERSIST_INFO = '_persist_keys'                  # 持久化键标记

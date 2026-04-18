@@ -18,11 +18,11 @@ class ServerEvents:
     @staticmethod
     def getOrCreateChain(eventType, isCustomEvent=False):
         # type: (str, bool) -> EventChain
-        if eventType in ServerEvents.globalEvents:
-            return ServerEvents.globalEvents[eventType]
+        if (eventType, isCustomEvent) in ServerEvents.globalEvents:
+            return ServerEvents.globalEvents[(eventType, isCustomEvent)]
         else:
             chain = EventChain()
-            ServerEvents.globalEvents[eventType] = chain
+            ServerEvents.globalEvents[(eventType, isCustomEvent)] = chain
             from ..subsystem import SubsystemManager
             SubsystemManager.getInstance().addListener(eventType, lambda ev: chain.dispatch(eventType, ev), isCustomEvent)
             return chain

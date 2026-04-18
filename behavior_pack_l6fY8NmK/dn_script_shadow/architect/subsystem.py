@@ -11,6 +11,9 @@ from .annotation import AnnotationHelper
 from .scheduler import Scheduler, Sched, SimpleFixedScheduler
 from .conf import EVENT_LISTENER, CUSTOM_EVENT, SYSTEM_SCHED_ANNO, SCHED_EVENT
 
+from .loader import __dirname__
+
+
 SYSTEM_CLIENT_NAME = '_ShadowSystemClient'
 SYSTEM_SERVER_NAME = '_ShadowSystemServer'
 
@@ -20,10 +23,6 @@ class EventListener:
         self.evType = evType
         self.fn = fn
         setattr(self, '<lambda>', self.fn)
-
-
-__filename__ = EventListener.__module__[:EventListener.__module__.rfind('.')]
-__dirname__ = __filename__[:__filename__.rfind('.')]
 
 
 class SubsystemManager:

@@ -12,16 +12,17 @@ _registerComponent(False, EventReader, False, True)
 
 
 class ClientEvents:
-    globalEvents = {}
+    globalEvents = {} # type: dict[tuple[str, bool], EventChain]
 
     @staticmethod
     def getOrCreateChain(eventType, isCustomEvent=False):
         # type: (str, bool) -> EventChain
-        if eventType in ClientEvents.globalEvents:
-            return ClientEvents.globalEvents[eventType]
+        print 'getOrCreateChain', (eventType, isCustomEvent)
+        if (eventType, isCustomEvent) in ClientEvents.globalEvents:
+            return ClientEvents.globalEvents[(eventType, isCustomEvent)]
         else:
             chain = EventChain()
-            ClientEvents.globalEvents[eventType] = chain
+            ClientEvents.globalEvents[(eventType, isCustomEvent)] = chain
             from ..subsystem import SubsystemManager
             SubsystemManager.getInstance().addListener(eventType, lambda ev: chain.dispatch(eventType, ev), isCustomEvent)
             return chain
