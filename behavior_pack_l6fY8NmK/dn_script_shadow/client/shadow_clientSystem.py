@@ -215,8 +215,10 @@ class ShadowClientSystem(ClientSubsystem):
     @EventListener(config.ClientItemTryUseEvent)
     def OnClientItemTryUse(self, args):
         """客户端尝试使用物品时触发，处理暗影能量的使用与消耗"""
+        # print args.dict()
         itemDict = args.itemDict
-        if itemDict.get("itemName") != "minecraft:stone_sword":
+        print itemDict
+        if itemDict.get("itemName") != "sf:shadow_energy":
             return
         playerId = args.playerId  # 从事件参数获取玩家ID
         # 获取当前暗影能量数据
@@ -227,16 +229,19 @@ class ShadowClientSystem(ClientSubsystem):
         # 能量已满：取消使用，物品不消耗
         if current_energy >= 100:
             args.cancel = True
-            notify_comp.SetLeftCornerNotify("暗影能量已满，无法使用该物品")
+            notify_comp.SetLeftCornerNotify("客户端：暗影能量已满，无法使用该物品")
             return
         # 能量未满：取消原始事件，通知服务端处理物品消耗和能量增加
         args.cancel = True
         self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
+        print "111"
 
     @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
     def OnAddShadowEnergy(self, args):
         """增加暗影能量（服务端通知）"""
-        amount = args.amount
+        # print args.dict()
+        amount = args.dict().amount
+        print "数量是 %s" % amount
         # 获取当前能量数据
         current_data = config_comp.GetConfigData("dn_shadow_energy")
         if not current_data:
@@ -260,6 +265,7 @@ class ShadowClientSystem(ClientSubsystem):
     def OnDamageEvent(self, args):
         """客户端玩家受伤事件"""
         entityId = args.entityId
+        print entityId
         if entityId in clientApi.GetPlayerList():
             print("客户端-玩家已受伤")
             # 获取当前数据（包含 is_full 字段）
@@ -283,7 +289,7 @@ class ShadowClientSystem(ClientSubsystem):
             if ui_node:
                 ui_node.UpdateShadow(new_ratio)
 
-    @EventListener(config.PlayerAttackEntityEvent, isCustomEvent=True)
+    @EventListener(config.PlayerAttackEntityEvent)
     def OnPlayerAttackEvent(self, args):
         """客户端玩家攻击事件"""
         playerId = args.playerId

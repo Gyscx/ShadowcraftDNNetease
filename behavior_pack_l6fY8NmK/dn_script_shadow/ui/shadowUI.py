@@ -3,7 +3,7 @@ import mod.client.extraClientApi as clientApi
 from mod_log import logger
 from .. import config
 
-from ..architect.subsystem import ClientSubsystem, SubsystemClient
+from ..client.shadow_clientSystem import ShadowClientSystem
 
 ViewBinder = clientApi.GetViewBinderCls()
 ScreenNode = clientApi.GetScreenNodeCls()
@@ -11,8 +11,7 @@ levelId = clientApi.GetLevelId()
 CCF = clientApi.GetEngineCompFactory()
 notify_comp = CCF.CreateTextNotifyClient(levelId)
 config_comp = CCF.CreateConfigClient(levelId)
-# client_sys = clientApi.GetSystem(config.ModName, config.ClientSystemName)
-client_sys = ClientSubsystem.getInstance()
+client_sys = ShadowClientSystem.getInstance()
 touchEventEnum = clientApi.GetMinecraftEnum().TouchEvent
 
 
