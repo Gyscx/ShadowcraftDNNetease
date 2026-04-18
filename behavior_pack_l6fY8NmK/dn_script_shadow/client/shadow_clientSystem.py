@@ -239,6 +239,7 @@ class ShadowClientSystem(ClientSubsystem):
     @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
     def OnAddShadowEnergy(self, args):
         """增加暗影能量（服务端通知）"""
+        print "444"
         # print args.dict()
         amount = args.dict().amount
         print "数量是 %s" % amount

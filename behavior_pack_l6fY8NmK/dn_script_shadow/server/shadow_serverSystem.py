@@ -116,8 +116,8 @@ class ShadowServerSystem(ServerSubsystem):
             item_comp.SetInvItemNum(selectedSlot, 0)
         else:
             item_comp.SetInvItemNum(selectedSlot, new_count)
-
         self.sendClient(playerId, config.AddShadowEnergyEvent, {"amount": 8})
+        print "333"
 
     @EventListener(config.DamageEvent)
     def OnDamageEvent(self, args):
