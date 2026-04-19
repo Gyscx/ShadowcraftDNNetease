@@ -483,6 +483,8 @@ class Subsystem(object):
     def _handleSchedEvents(self, eventType, instMethod, isCustom, schedFlag):
         schedKey = (eventType, isCustom)
         reader = getOrCreateSingletonComponent('EventReader')
+        if not reader:
+            return
         if schedKey not in self._schedEvents:
             self._schedEvents[schedKey] = ([], [])
             def handler(event):

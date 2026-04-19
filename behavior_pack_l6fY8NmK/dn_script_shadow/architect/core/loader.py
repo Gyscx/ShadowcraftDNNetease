@@ -49,6 +49,10 @@ def getPlugin(name):
     # type: (str) -> PluginBase
     return _LOADED_SERVER_PLUGINS[name] if isServer() else _LOADED_CLIENT_PLUGINS[name]
 
+def hasPlugin(name):
+    # type: (str) -> bool
+    return name in _plugins()
+
 def _notifyAddSubsystem(subsystem):
     # type: (Subsystem) -> None
     for _host in _plugins().values():
@@ -66,8 +70,9 @@ def _notifyRegisterComponent(compCls):
 
 
 class _PluginHost(object):
-    def __init__(self, name, author, desc, compCls):
+    def __init__(self, name, ver, author, desc, compCls):
         self.name = name
+        self.ver = ver
         self.author = author
         self.desc = desc
         self.compCls = compCls # type: type[PluginBase]
@@ -87,11 +92,11 @@ class _PluginHost(object):
         self._inst = _inst
 
 
-def Plugin(name, author='Unknown', desc='Unknown'):
+def Plugin(name, ver=[0, 0, 1], author='Unknown', desc='Unknown'):
     def _decorator(cls):
         # type: (type) -> type
         if cls not in _REGISTERED_PLUGINS:
-            _REGISTERED_PLUGINS[name] = _PluginHost(name, author, desc, cls)
+            _REGISTERED_PLUGINS[name] = _PluginHost(name, ver, author, desc, cls)
         return cls
     return _decorator
 
