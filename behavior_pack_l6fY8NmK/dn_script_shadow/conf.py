@@ -27,5 +27,6 @@ $vendor为系统插件, $user为用户插件
 用户插件在{modname}/plugins目录下
 """
 PLUGINS = [
-    '$vendor.event',        # 事件系统
+    '$user.test',
+    '$user.test2',
 ]

@@ -238,7 +238,7 @@ class ShadowClientSystem(ClientSubsystem):
         """增加暗影能量（服务端通知）"""
         print "444"
         # print args.dict()
-        amount = args.dict().amount
+        amount = args.amount
         print "数量是 %s" % amount
         # 获取当前能量数据
         current_data = config_comp.GetConfigData("dn_shadow_energy")
