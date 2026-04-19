@@ -231,9 +231,7 @@ class ShadowClientSystem(ClientSubsystem):
             return
         # 能量未满：取消原始事件，通知服务端处理物品消耗和能量增加
         args.cancel = True
-        self.system.NotifyToServer('ClientUseShadowEnergyEvent', {"playerId": playerId})
-        print '111111111'
-        # self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
+        self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
 
     @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
     def OnAddShadowEnergy(self, args):

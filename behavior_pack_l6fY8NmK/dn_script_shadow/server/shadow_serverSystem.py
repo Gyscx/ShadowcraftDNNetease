@@ -15,17 +15,6 @@ levelId = serverApi.GetLevelId()
 class ShadowServerSystem(ServerSubsystem):
     def onInit(self):
         print "===== Shadow Server System Init (Dynamic) ====="
-        self.system.ListenForEvent(
-            serverApi.GetEngineNamespace(),
-            serverApi.GetEngineSystemName(),
-            'ClientUseShadowEnergyEvent',
-            self,
-            self.onClientUseShadowEnergyEventaaa
-        )
-        print 'added ClientUseShadowEnergyEvent'
-
-    def onClientUseShadowEnergyEventaaa(self, args):
-        print 'ClientUseShadowEnergyEvent: ', args
 
     def GetSkillConfig(self, skill_id):
         """获取技能配置"""
@@ -118,7 +107,7 @@ class ShadowServerSystem(ServerSubsystem):
         inv_pos = serverApi.GetMinecraftEnum().ItemPosType.INVENTORY
 
         current_item = item_comp.GetPlayerItem(inv_pos, selectedSlot)
-        if not current_item or current_item.get("itemName") != "minecraft:grass":
+        if not current_item or current_item.get("itemName") != "minecraft:grass_block":
             return
 
         count = current_item.get("count", 1)
