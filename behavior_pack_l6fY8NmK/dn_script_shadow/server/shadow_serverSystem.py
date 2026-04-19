@@ -107,7 +107,7 @@ class ShadowServerSystem(ServerSubsystem):
         inv_pos = serverApi.GetMinecraftEnum().ItemPosType.INVENTORY
 
         current_item = item_comp.GetPlayerItem(inv_pos, selectedSlot)
-        if not current_item or current_item.get("itemName") != "minecraft:grass_block":
+        if not current_item or current_item.get("itemName") != "sf:shadow_energy":
             return
 
         count = current_item.get("count", 1)

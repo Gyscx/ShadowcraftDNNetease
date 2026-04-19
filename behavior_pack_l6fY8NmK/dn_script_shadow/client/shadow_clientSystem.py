@@ -216,7 +216,7 @@ class ShadowClientSystem(ClientSubsystem):
         """客户端尝试使用物品时触发，处理暗影能量的使用与消耗"""
         # print args.dict()
         itemDict = args.itemDict
-        if itemDict.get("newItemName") != "minecraft:grass_block":
+        if itemDict.get("newItemName") != "sf:shadow_energy":
             return
         playerId = args.playerId  # 从事件参数获取玩家ID
         # 获取当前暗影能量数据

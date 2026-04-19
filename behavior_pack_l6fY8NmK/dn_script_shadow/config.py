@@ -99,7 +99,7 @@ SKILL_CONFIGS = [
         # 修改为valid_items格式
         "valid_items": [
             {
-                "item_identifier": "minecraft:bow",
+                "item_identifier": "sf:world_slicer",
                 "item_slot_type": "hotbar",
                 "hotbar_slot": 0,  # 快捷栏第1格
                 "texture_name": "shadow_onslaught",  # 原texture_name字段的值
