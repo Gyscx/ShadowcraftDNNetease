@@ -69,3 +69,16 @@ class SchedUpdateFlags:
 class SchedEventFlags:
     Event = SCHED_EVENT
     AfterEvent = SCHED_AFTER_EVENT
+
+
+try:
+    from .. import conf as userConf
+except:
+    userConf = object()
+vendorConf = globals()
+
+def conf(key):
+    try:
+        return userConf.__dict__[key]
+    except:
+        return vendorConf[key]

@@ -14,10 +14,10 @@ MOD_VERSION = '1.0.0'
 MOD_ENGINE_NAME = MOD_NAME
 MOD_SYSTEM_NAME = 'ModSubsystem'
 MOD_SERVER_MODULES = [
-    'server',
+    'server.shadow_serverSystem',
 ]
 MOD_CLIENT_MODULES = [
-    'client',
+    'client.shadow_clientSystem',
 ]
 
 # 插件列表

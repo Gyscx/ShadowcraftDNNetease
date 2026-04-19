@@ -154,18 +154,20 @@ MOD_ARRAYS = [
 
 def modConf():
     from .. import conf
-    userConf = serverApi.ImportModule(__modname__ + '.conf') if isServer() else clientApi.ImportModule(__modname__ + '.conf')
+    _confModule = serverApi.ImportModule(__modname__ + '.conf') if isServer() else clientApi.ImportModule(__modname__ + '.conf')
+    engineConf = conf.__dict__
+    userConf = _confModule.__dict__
     def getter(key):
         if key in MOD_CONST_NAMES:
             _user = userConf.get(key)
             if _user is None:
-                return getattr(conf, key)
+                return engineConf.get(key)
             return _user
         elif key in MOD_ARRAYS:
             _user = userConf.get(key)
             if _user is None:
                 return getattr(conf, key)
-            return _user + getattr(conf, key)
+            return set(engineConf.get(key) + _user)
         else:
             return None
     return getter

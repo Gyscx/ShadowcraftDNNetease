@@ -82,7 +82,6 @@ class SubsystemManager:
             raise ImportError('请在 {} 文件夹中创建 conf.py 文件，并定义 MOD_ENGINE_NAME 和 MOD_SYSTEM_NAME'.format(__modname__))
         engine = MOD_ENGINE_NAME
         sysName = MOD_SYSTEM_NAME
-        getConf = modConf()
         existed = serverApi.GetSystem(engine, sysName)
         manager = existed.getManager() if existed else SubsystemManager(
             serverApi.RegisterSystem(engine, sysName, cls.__module__ + '.' + SYSTEM_SERVER_NAME),
@@ -93,6 +92,7 @@ class SubsystemManager:
         SubsystemManager.server = manager
         def _initLater(_):
             # 在manager之前初始化，否则无法监听组件注册和子系统变更
+            getConf = modConf()
             for serverModule in getConf('MOD_SERVER_MODULES'):
                 serverApi.ImportModule(cls._relative(serverModule))
             _loadPlugins(manager)
@@ -648,8 +648,8 @@ class _ShadowSystemClient(ClientSystem):
         return SubsystemManager.getInstance()
 
 
-def createServer(engine, sysName, serverDir=None):
-    return SubsystemManager.createServer(engine, sysName, serverDir)
+def createServer():
+    return SubsystemManager.createServer()
 
-def createClient(engine, sysName, clientDir=None):
-    return SubsystemManager.createClient(engine, sysName, clientDir)
+def createClient():
+    return SubsystemManager.createClient()
