@@ -216,8 +216,7 @@ class ShadowClientSystem(ClientSubsystem):
         """客户端尝试使用物品时触发，处理暗影能量的使用与消耗"""
         # print args.dict()
         itemDict = args.itemDict
-        print itemDict
-        if itemDict.get("itemName") != "sf:shadow_energy":
+        if itemDict.get("newItemName") != "minecraft:grass_block":
             return
         playerId = args.playerId  # 从事件参数获取玩家ID
         # 获取当前暗影能量数据
@@ -232,8 +231,9 @@ class ShadowClientSystem(ClientSubsystem):
             return
         # 能量未满：取消原始事件，通知服务端处理物品消耗和能量增加
         args.cancel = True
-        self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
-        print "111"
+        self.system.NotifyToServer('ClientUseShadowEnergyEvent', {"playerId": playerId})
+        print '111111111'
+        # self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
 
     @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
     def OnAddShadowEnergy(self, args):

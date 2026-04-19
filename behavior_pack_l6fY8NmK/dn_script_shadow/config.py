@@ -2,10 +2,10 @@
 ModName = "shadow_craft"
 ModVersion = '0.0.1'
 
-ServerSystemName = "ShadowServerSystem"
+ServerSystemName = "ShadowSystem"
 ServerSystemClsPath = "dn_script_shadow.server.shadow_serverSystem.ShadowServerSystem"
 
-ClientSystemName = "ShadowClientSystem"
+ClientSystemName = "ShadowSystem"
 ClientSystemClsPath = "dn_script_shadow.client.shadow_clientSystem.ShadowClientSystem"
 
 UiInitFinishedEvent = "UiInitFinished"

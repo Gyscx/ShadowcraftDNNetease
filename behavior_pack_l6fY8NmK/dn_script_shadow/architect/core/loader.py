@@ -139,3 +139,33 @@ def _loadPlugins(manager):
             _host.onReady(manager)
         except Exception as e:
             print('[ERROR] Failed to ready plugin ' + _host.name)
+
+
+MOD_CONST_NAMES = [
+    'MOD_NAME',
+    'MOD_VERSION',
+    'MOD_ENGINE_NAME',
+    'MOD_SYSTEM_NAME',
+]
+MOD_ARRAYS = [
+    'MOD_SERVER_MODULES',
+    'MOD_CLIENT_MODULES',
+]
+
+def modConf():
+    from .. import conf
+    userConf = serverApi.ImportModule(__modname__ + '.conf') if isServer() else clientApi.ImportModule(__modname__ + '.conf')
+    def getter(key):
+        if key in MOD_CONST_NAMES:
+            _user = userConf.get(key)
+            if _user is None:
+                return getattr(conf, key)
+            return _user
+        elif key in MOD_ARRAYS:
+            _user = userConf.get(key)
+            if _user is None:
+                return getattr(conf, key)
+            return _user + getattr(conf, key)
+        else:
+            return None
+    return getter

@@ -1,5 +1,4 @@
-import config
-from mod.common.mod import Mod
+from architect.mod import *
 
 # # 换成实际的name和version
 # @Mod.Binding(name = config.ModName, version = config.ModVersion)
