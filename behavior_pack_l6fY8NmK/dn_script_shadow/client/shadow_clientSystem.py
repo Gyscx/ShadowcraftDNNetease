@@ -25,6 +25,176 @@ class ShadowClientSystem(ClientSubsystem):
         for skill in config.SKILL_CONFIGS:
             self.skill_cooldowns[skill["skill_id"]] = 0.0
         self.RegisterCustomKey()
+        self.skill_levels = {}  # skill_id -> level
+        self.loadSkillLevels()
+
+        # +++ 新增：向服务端请求技能等级同步
+        self.SendSkillLevelSyncRequest()
+
+    def SendSkillLevelSyncRequest(self):
+        """向服务端发送技能等级同步请求"""
+        player_id = clientApi.GetLocalPlayerId()
+        self.sendServer(config.RequestSkillLevelsEvent, {
+            "playerId": player_id
+        })
+
+    # 文件: shadow_clientSystem.py
+    # 方法: OnSyncSkillLevels
+    # 修改后的代码段
+    @EventListener(config.SyncSkillLevelsEvent, isCustomEvent=True)
+    def OnSyncSkillLevels(self, args):
+        """接收服务端同步的技能等级"""
+        skill_levels = args.skill_levels
+        if skill_levels:
+            self.skill_levels = skill_levels
+            self.saveSkillLevels()  # 保存到本地配置
+            logger.info("从服务端同步技能等级: %s" % skill_levels)
+
+            # +++ 修复点：确保在数据同步后，UI被创建或刷新
+            if not hasattr(self, 'mshadowUINode') or self.mshadowUINode is None:
+                # UI可能尚未创建，此时创建UI
+                clientApi.RegisterUI(config.ModName, config.shadowUIName, config.shadowUIPyClsPath,
+                                     config.shadowUIScreenDef)
+                self.mshadowUINode = clientApi.CreateUI(config.ModName, config.shadowUIName, {"isHud": 1})
+            # 获取UI节点并更新
+            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+            if ui_node:
+                for skill_id, level in skill_levels.items():
+                    ui_node.UpdateSkillLevel(skill_id, level)
+                logger.info("UI技能等级已更新为服务端数据。")
+
+    def loadSkillLevels(self):
+        """加载技能等级数据"""
+        level_data = config_comp.GetConfigData("dn_skill_levels")
+        if not level_data:
+            # 初始化默认等级
+            for skill in config.SKILL_CONFIGS:
+                self.skill_levels[skill["skill_id"]] = 1
+            self.saveSkillLevels()
+        else:
+            self.skill_levels = level_data
+
+    def saveSkillLevels(self):
+        """保存技能等级数据"""
+        config_comp.SetConfigData("dn_skill_levels", self.skill_levels)
+
+    def getSkillLevel(self, skill_id):
+        """获取技能等级"""
+        return self.skill_levels.get(skill_id, 1)
+
+    def getUpgradeInfo(self, skill_id):
+        """获取技能升级信息"""
+        current_level = self.getSkillLevel(skill_id)
+
+        if current_level >= config.SKILL_UPGRADE_CONFIG["max_level"]:
+            return None  # 已达最高等级
+
+        # 获取下一级配置
+        next_level = current_level + 1
+
+        # 优先使用技能特定的升级配置
+        skill_upgrade_config = config.SKILL_UPGRADE_CONFIG["upgrade_effects"].get(skill_id)
+        if skill_upgrade_config and len(skill_upgrade_config) >= next_level:
+            return skill_upgrade_config[next_level - 1]  # 列表索引从0开始
+
+        # 使用通用升级配置
+        common_config = config.SKILL_UPGRADE_CONFIG["common_upgrade_effects"]
+        if len(common_config) >= next_level:
+            return common_config[next_level - 1]
+
+        return None
+
+    def canUpgradeSkill(self, skill_id):
+        """检查技能是否可以升级"""
+        if skill_id not in self.skill_levels:
+            return False
+
+        current_level = self.skill_levels[skill_id]
+        if current_level >= config.SKILL_UPGRADE_CONFIG["max_level"]:
+            return False
+
+        upgrade_info = self.getUpgradeInfo(skill_id)
+        if not upgrade_info:
+            return False
+
+        # 检查是否有足够的暗影碎片
+        fragment_cost = upgrade_info.get("fragment_cost", 0)
+        if fragment_cost <= 0:
+            return True
+
+        # 检查背包中的暗影碎片数量
+        fragment_count = self.getFragmentCount()
+        return fragment_count >= fragment_cost
+
+    def getFragmentCount(self):
+        """获取暗影碎片数量（苹果）"""
+        item_comp = CCF.CreateItem(clientApi.GetLocalPlayerId())
+        inv_pos = clientApi.GetMinecraftEnum().ItemPosType.INVENTORY
+
+        total_count = 0
+        for slot in range(9):  # 检查快捷栏
+            item_dict = item_comp.GetPlayerItem(inv_pos, slot)
+            # 修复：检查苹果数量
+            if item_dict and item_dict.get('itemName') == config.SKILL_UPGRADE_CONFIG["fragment_item_id"]:
+                total_count += item_dict.get('count', 0)
+
+        return total_count
+
+    def upgradeSkill(self, skill_id):
+        """升级技能"""
+        if not self.canUpgradeSkill(skill_id):
+            return False
+
+        # 获取升级信息
+        upgrade_info = self.getUpgradeInfo(skill_id)
+        if not upgrade_info:
+            return False
+
+        fragment_cost = upgrade_info.get("fragment_cost", 0)
+
+        # 不再在客户端消耗碎片，改为发送请求到服务端
+        # 发送升级请求到服务端，由服务端处理碎片消耗
+        self.sendServer(config.ServerUpgradeSkillEvent, {
+            "skill_id": skill_id,
+            "playerId": clientApi.GetLocalPlayerId(),
+            "fragment_cost": fragment_cost
+        })
+
+        return True  # 表示请求已发送，实际结果等待服务端回调
+
+    def getActualCooldown(self, skill_id, base_cooldown):
+        """获取实际冷却时间（考虑等级加成）"""
+        level = self.getSkillLevel(skill_id)
+
+        # 获取当前等级的冷却时间乘数
+        skill_upgrade_config = config.SKILL_UPGRADE_CONFIG["upgrade_effects"].get(skill_id)
+        if skill_upgrade_config and len(skill_upgrade_config) >= level:
+            cooldown_multiplier = skill_upgrade_config[level - 1].get("cooldown_multiplier", 1.0)
+        else:
+            # 使用通用配置
+            common_config = config.SKILL_UPGRADE_CONFIG["common_upgrade_effects"]
+            if len(common_config) >= level:
+                cooldown_multiplier = common_config[level - 1].get("cooldown_multiplier", 1.0)
+            else:
+                cooldown_multiplier = 1.0
+
+        return base_cooldown * cooldown_multiplier
+
+    def getDamageMultiplier(self, skill_id):
+        """获取伤害乘数"""
+        level = self.getSkillLevel(skill_id)
+
+        # 获取当前等级的伤害乘数
+        skill_upgrade_config = config.SKILL_UPGRADE_CONFIG["upgrade_effects"].get(skill_id)
+        if skill_upgrade_config and len(skill_upgrade_config) >= level:
+            return skill_upgrade_config[level - 1].get("damage_multiplier", 1.0)
+        else:
+            # 使用通用配置
+            common_config = config.SKILL_UPGRADE_CONFIG["common_upgrade_effects"]
+            if len(common_config) >= level:
+                return common_config[level - 1].get("damage_multiplier", 1.0)
+            else:
+                return 1.0
 
     def RegisterCustomKey(self):
         """动态注册所有技能按键"""
@@ -108,41 +278,50 @@ class ShadowClientSystem(ClientSubsystem):
                 break
 
     def TriggerSkillAbility(self, skill_id):
-        """处理玩家释放技能相关逻辑"""
+        """处理玩家释放技能相关逻辑（修改版，应用等级加成）"""
         skill_cfg = self.GetSkillConfig(skill_id)
         if not skill_cfg:
             return False
+
+        # 获取实际冷却时间（考虑等级）
+        actual_cooldown = self.getActualCooldown(skill_id, skill_cfg["cooldown"])
+
         ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
         if not ui_node or not hasattr(ui_node, 'ConsumeShadowForAbility'):
             return False
+
         # 检查冷却
         if self.skill_cooldowns.get(skill_id, 0.0) > 0.0:
             return False
+
         # 获取当前匹配的物品配置
         matched_item_config = self.GetMatchedItemConfig(skill_id)
         if not matched_item_config:
-            return False  # 没有穿戴任何有效的物品
+            return False
+
         # 消耗能量
         if ui_node.ConsumeShadowForAbility(skill_cfg["energy_cost"]):
+            # ... 原有的技能特效代码 ...
             if skill_id == "RW" and matched_item_config["item_identifier"] == "minecraft:arrow":
                 render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
                 render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
-                render_comp.AddPlayerParticleEffect("shadow_blast","sf:shadow_blast")
+                render_comp.AddPlayerParticleEffect("shadow_blast", "sf:shadow_blast")
                 render_comp.RebuildPlayerRender()
                 time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
                 time_comp.AddTimer(2.0, self.ResetPlayerGeo)
 
-            # 通知服务器，并传递具体物品标识符
-            self.sendServer(config.ServerSkillEvent,{
+            # 发送到服务端，传递伤害乘数
+            self.sendServer(config.ServerSkillEvent, {
                 "skill": skill_id,
                 "playerId": clientApi.GetLocalPlayerId(),
-                "itemIdentifier": matched_item_config["item_identifier"]  # 新增
+                "itemIdentifier": matched_item_config["item_identifier"],
+                "damageMultiplier": self.getDamageMultiplier(skill_id)  # 新增：传递伤害乘数
             })
-            # 设置冷却时间
-            cooldown_duration = skill_cfg["cooldown"]
-            self.skill_cooldowns[skill_id] = cooldown_duration
+
+            # 设置冷却时间（使用实际冷却时间）
+            self.skill_cooldowns[skill_id] = actual_cooldown
             if ui_node:
-                ui_node.StartCooldown(skill_id, cooldown_duration)
+                ui_node.StartCooldown(skill_id, actual_cooldown)
             return True
         return False
 
@@ -152,6 +331,20 @@ class ShadowClientSystem(ClientSubsystem):
         render_comp.AddPlayerGeometry("default", "geometry.humanoid.custom")
         render_comp.RebuildPlayerRender()
         # notify_comp.SetLeftCornerNotify("已恢复原版模型")
+
+    @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
+    def OnClientUpgradeSkill(self, args):
+        """客户端请求升级技能"""
+        skill_id = args.skill_id
+        if not skill_id:
+            return
+
+        success = self.upgradeSkill(skill_id)
+
+        # 发送升级结果到UI
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        if ui_node:
+            ui_node.OnUpgradeResult(skill_id, success)
 
     def onUpdate(self, dt):
         """每帧更新"""
@@ -177,6 +370,8 @@ class ShadowClientSystem(ClientSubsystem):
                 # 冷却结束后恢复默认状态
                 if cooldown_left <= 0.0:
                     ui_node.UpdateSkillButtonState(skill_id, has_item)
+                    # +++ 更新升级按钮可见性
+                ui_node.UpdateUpgradeButtonVisibility(skill_id)
 
     @EventListener(config.UiInitFinishedEvent)
     def OnUIInitFinished(self, args):
@@ -310,6 +505,58 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
             if ui_node:
                 ui_node.UpdateShadow(new_ratio)
+
+    # 在 shadow_clientSystem.py 中添加
+
+    @EventListener(config.UpgradeSkillResultEvent, isCustomEvent=True)
+    def OnUpgradeSkillResult(self, args):
+        """处理服务端返回的升级结果"""
+        skill_id = args.skill_id
+        new_level = args.new_level
+        success = args.success
+
+        if success:
+            # 更新本地技能等级
+            self.skill_levels[skill_id] = new_level
+            self.saveSkillLevels()
+
+            # 更新UI
+            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+            if ui_node:
+                ui_node.UpdateSkillLevel(skill_id, new_level)
+
+            # +++ 修复：使用更安全的方式获取事件参数
+            # 如果属性不存在，则使用getattr返回默认值
+            damage_multiplier = getattr(args.dict(), 'damage_multiplier', 1.0)
+            cooldown_multiplier = getattr(args.dict(), 'cooldown_multiplier', 1.0)
+
+            # 额外的类型安全检查
+            try:
+                damage_multiplier = float(damage_multiplier)
+            except (TypeError, ValueError):
+                damage_multiplier = 1.0
+
+            try:
+                cooldown_multiplier = float(cooldown_multiplier)
+            except (TypeError, ValueError):
+                cooldown_multiplier = 1.0
+
+            # 显示升级成功消息
+            level_text = "LV" + str(new_level)
+            damage_bonus = int((damage_multiplier - 1.0) * 100)
+            cooldown_reduction = int((1.0 - cooldown_multiplier) * 100)
+
+            message = "§a%s技能升级到%s！§f" % (skill_id, level_text)
+            if damage_bonus > 0:
+                message += " 伤害+%d%%" % damage_bonus
+            if cooldown_reduction > 0:
+                message += " 冷却-%d%%" % cooldown_reduction
+
+            notify_comp.SetLeftCornerNotify(message)
+        else:
+            # 升级失败，显示原因
+            reason = args.reason
+            notify_comp.SetLeftCornerNotify("升级失败: %s" % reason)
 
     def SendShadowMessage(self):
         """获取当前暗影能量数据（当前无实际功能，但保留调用）"""

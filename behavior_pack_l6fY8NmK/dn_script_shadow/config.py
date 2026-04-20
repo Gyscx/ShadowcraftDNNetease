@@ -17,12 +17,16 @@ ServerSkillEvent = "ServerSkillEvent"
 ClientItemTryUseEvent = "ClientItemTryUseEvent"
 ClientUseShadowEnergyEvent = "ClientUseShadowEnergyEvent"
 AddShadowEnergyEvent = "AddShadowEnergyEvent"
+ClientUpgradeSkillEvent = "ClientUpgradeSkillEvent"
+ServerUpgradeSkillEvent = "ServerUpgradeSkillEvent"
+UpgradeSkillResultEvent = "UpgradeSkillResultEvent"
+RequestSkillLevelsEvent = "RequestSkillLevelsEvent"
+SyncSkillLevelsEvent = "SyncSkillLevelsEvent"        
 
 shadowUIName = "shadow_energy"
 shadowUIPyClsPath = "dn_script_shadow.ui.shadowUI.ShadowScreenUI"
 shadowUIScreenDef = "shadow_energy.main"
 
-# 在config.py中添加以下配置
 # 技能配置列表 - 核心数据结构
 SKILL_CONFIGS = [
     {
@@ -145,3 +149,40 @@ SKILL_STATE = {
     "NO_ITEM": 2,  # 无物品
     "NO_ENERGY": 3  # 能量不足
 }
+
+# 技能升级系统配置
+SKILL_UPGRADE_CONFIG = {
+    "max_level": 5,  # 最高等级
+    "fragment_item_id": "minecraft:apple",  # 暗影碎片物品ID
+    "upgrade_effects": {
+        "helmet": [
+            {"level": 1, "damage_multiplier": 1.0, "cooldown_multiplier": 1.0, "fragment_cost": 0},
+            {"level": 2, "damage_multiplier": 1.1, "cooldown_multiplier": 0.9, "fragment_cost": 5},
+            {"level": 3, "damage_multiplier": 1.2, "cooldown_multiplier": 0.8, "fragment_cost": 10},
+            {"level": 4, "damage_multiplier": 1.3, "cooldown_multiplier": 0.7, "fragment_cost": 15},
+            {"level": 5, "damage_multiplier": 1.4, "cooldown_multiplier": 0.6, "fragment_cost": 20}
+        ],
+        "armor": [
+            {"level": 1, "damage_multiplier": 1.0, "cooldown_multiplier": 1.0, "fragment_cost": 0},
+            {"level": 2, "damage_multiplier": 1.1, "cooldown_multiplier": 0.9, "fragment_cost": 5},
+            {"level": 3, "damage_multiplier": 1.2, "cooldown_multiplier": 0.8, "fragment_cost": 10},
+            {"level": 4, "damage_multiplier": 1.3, "cooldown_multiplier": 0.7, "fragment_cost": 15},
+            {"level": 5, "damage_multiplier": 1.4, "cooldown_multiplier": 0.6, "fragment_cost": 20}
+        ],
+        "weapon": [
+            {"level": 1, "damage_multiplier": 1.0, "cooldown_multiplier": 1.0, "fragment_cost": 0},
+            {"level": 2, "damage_multiplier": 1.1, "cooldown_multiplier": 0.9, "fragment_cost": 5},
+            {"level": 3, "damage_multiplier": 1.2, "cooldown_multiplier": 0.8, "fragment_cost": 10},
+            {"level": 4, "damage_multiplier": 1.3, "cooldown_multiplier": 0.7, "fragment_cost": 15},
+            {"level": 5, "damage_multiplier": 1.4, "cooldown_multiplier": 0.6, "fragment_cost": 20}
+        ],
+        "RW": [
+            {"level": 1, "damage_multiplier": 1.0, "cooldown_multiplier": 1.0, "fragment_cost": 0},
+            {"level": 2, "damage_multiplier": 1.1, "cooldown_multiplier": 0.9, "fragment_cost": 5},
+            {"level": 3, "damage_multiplier": 1.2, "cooldown_multiplier": 0.8, "fragment_cost": 10},
+            {"level": 4, "damage_multiplier": 1.3, "cooldown_multiplier": 0.7, "fragment_cost": 15},
+            {"level": 5, "damage_multiplier": 1.4, "cooldown_multiplier": 0.6, "fragment_cost": 20}
+        ]
+    }
+}
+

@@ -19,9 +19,7 @@
 
         ],
         "customVariables": {
-            "D:\\program\\shadow\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
-                "$shadow"
-            ]
+
         },
         "expandData": {
             "prefab": {
@@ -31,6 +29,16 @@
                 "D:\\MCStudioDownload\\work\\gxc1250378829@163.com\\Cpp\\AddOn\\0332e5d62a8e4419858de530b67b963e\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
                     "/main",
                     "/main/shadowPanel"
+                ],
+                "D:\\program\\ShadowcraftDNNetease\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
+                    "/main",
+                    "/main/shadowPanel",
+                    "/main/shadowPanel/shadow_ability",
+                    "/main/shadowPanel/shadow_ability/helmet_ability/default",
+                    "/main/shadowPanel/shadow_ability/armor_ability/default",
+                    "/main/shadowPanel/shadow_ability/weapon_ability/default",
+                    "/main/shadowPanel/shadow_ability/rangedWeapon_ability/default",
+                    "/main/shadowPanel/upgrade_panel"
                 ],
                 "D:\\program\\shadow\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
                     "/main",
