@@ -366,7 +366,7 @@ class ShadowScreenUI(ScreenNode):
 
         if fragment_cost > 0:
             fragment_count = client_sys.getFragmentCount()
-            cost_text += "\n需要苹果: %d" % fragment_cost
+            cost_text += "，需要暗影能量: %d" % fragment_cost
             cost_text += "\n当前拥有: %d" % fragment_count
 
             if fragment_count < fragment_cost:
@@ -381,7 +381,7 @@ class ShadowScreenUI(ScreenNode):
         if damage_bonus > 0:
             cost_text += "\n§a伤害增加: +%d%%§f" % damage_bonus
         if cooldown_reduction > 0:
-            cost_text += "\n§a冷却减少: -%d%%§f" % cooldown_reduction
+            cost_text += "§a，冷却减少: -%d%%§f" % cooldown_reduction
 
         self.upgrade_cost_text = cost_text
 
@@ -518,6 +518,29 @@ class ShadowScreenUI(ScreenNode):
         audio_comp = CCF.CreateAudio(player_id)
         audio_comp.PlayUI("random.levelup", 1.0, 1.0)
 
+    def __getattr__(self, name):
+        """动态处理技能纹理和冷却时间的获取"""
+        # 处理纹理属性
+        if name.endswith("_default_texture"):
+            skill_id = name.replace("_default_texture", "")
+            if skill_id in self.skill_states:
+                return self.skill_states[skill_id].get("texture", "textures/ui/button_locked")
+
+        # 处理冷却时间属性
+        elif name.endswith("_cooldown_time"):
+            skill_id = name.replace("_cooldown_time", "")
+            if skill_id in self.skill_states:
+                return "%.1f" % self.skill_states[skill_id].get("cooldown_time", 0.0)
+
+        # 处理其他动态属性
+        elif name.endswith("_has_item"):
+            skill_id = name.replace("_has_item", "")
+            if skill_id in self.skill_states:
+                return self.skill_states[skill_id].get("has_item", False)
+
+        # 如果属性不存在，抛出 AttributeError
+        raise AttributeError("'ShadowScreenUI' object has no attribute '%s'" % name)
+
     # 数据绑定方法扩展
     @ViewBinder.binding(ViewBinder.BF_BindString, '#helmet_level_text')
     def ReturnHelmetLevelText(self):
@@ -564,25 +587,3 @@ class ShadowScreenUI(ScreenNode):
     def ReturnRWDefaultTexture(self):
         return self.RW_default_texture
 
-    def __getattr__(self, name):
-        """动态处理技能纹理和冷却时间的获取"""
-        # 处理纹理属性
-        if name.endswith("_default_texture"):
-            skill_id = name.replace("_default_texture", "")
-            if skill_id in self.skill_states:
-                return self.skill_states[skill_id].get("texture", "textures/ui/button_locked")
-
-        # 处理冷却时间属性
-        elif name.endswith("_cooldown_time"):
-            skill_id = name.replace("_cooldown_time", "")
-            if skill_id in self.skill_states:
-                return "%.1f" % self.skill_states[skill_id].get("cooldown_time", 0.0)
-
-        # 处理其他动态属性
-        elif name.endswith("_has_item"):
-            skill_id = name.replace("_has_item", "")
-            if skill_id in self.skill_states:
-                return self.skill_states[skill_id].get("has_item", False)
-
-        # 如果属性不存在，抛出 AttributeError
-        raise AttributeError("'ShadowScreenUI' object has no attribute '%s'" % name)

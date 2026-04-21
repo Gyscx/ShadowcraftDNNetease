@@ -23,79 +23,12 @@ class ShadowServerSystem(ServerSubsystem):
                 return skill
         return None
 
-    @EventListener(config.ServerSkillEvent, isCustomEvent=True)
-    def OnSkillEvent(self, args):
-        """服务端释放技能事件（使用命令）"""
-        skill_id = args.skill
-        player_id = args.playerId
-        item_identifier_used = args.itemIdentifier
-        damage_multiplier = args.damageMultiplier # 获取伤害乘数
-
-        if not player_id:
-            player_id = serverApi.GetHostPlayerId()
-
-        skill_cfg = self.GetSkillConfig(skill_id)
-        if not skill_cfg:
-            logger.error("未知技能ID: %s" % skill_id)
-            return
-
-        # 确定要执行的命令列表
-        commands_to_execute = []
-        if item_identifier_used and "valid_items" in skill_cfg:
-            for item_config in skill_cfg["valid_items"]:
-                if item_config["item_identifier"] == item_identifier_used:
-                    commands_to_execute = item_config.get("server_commands", [])
-                    break
-
-        # 如果没匹配到，或者没传item_identifier，则执行第一个物品的命令（或可以定义默认行为）
-        if not commands_to_execute and skill_cfg.get("valid_items"):
-            commands_to_execute = skill_cfg["valid_items"][0].get("server_commands", [])
-
-        # 执行命令
-        cmd_comp = serverApi.GetEngineCompFactory().CreateCommand(levelId)
-        for command in commands_to_execute:
-            # 如果命令中包含伤害值，可以在这里进行修改
-            # 例如：/damage @e[r=3,type=!player] 30 entity_attack entity @s
-            if damage_multiplier != 1.0 and "damage" in command:
-                # 提取伤害值并乘以伤害乘数
-                import re
-                # 查找数字
-                numbers = re.findall(r'\d+', command)
-                if numbers:
-                    # 这里需要根据实际情况调整，可能需要更复杂的解析
-                    pass
-            cmd_comp.SetCommand(command, player_id)
-        if skill_id == "RW" and item_identifier_used == "minecraft:arrow":
-            time_comp = SCF.CreateGame(levelId)
-            time_comp.AddTimer(1.0, self.DelayDamage)
-        logger.info("玩家 %s 释放了技能: %s (物品: %s)" % (player_id, skill_id, item_identifier_used or "默认"))
-
     def DelayDamage(self):
         """shadow_blast技能延迟施加伤害"""
         cmd_comp = serverApi.GetEngineCompFactory().CreateCommand(levelId)
         player_id = serverApi.GetHostPlayerId()
         delay_command = "/function shadow_skills"
         cmd_comp.SetCommand(delay_command, player_id)
-
-    def OnHelmetSkillUsed(self, player_id):
-        """头盔技能额外效果"""
-        # 可以添加头盔特有的逻辑
-        pass
-
-    def OnArmorSkillUsed(self, player_id):
-        """胸甲技能额外效果"""
-        # 可以添加胸甲特有的逻辑
-        pass
-
-    def OnWeaponSkillUsed(self, player_id):
-        """武器技能额外效果"""
-        # 可以添加武器特有的逻辑
-        pass
-
-    def OnRangedSkillUsed(self, player_id):
-        """远程武器技能额外效果"""
-        # 可以添加远程武器特有的逻辑
-        pass
 
     @EventListener(config.ClientUseShadowEnergyEvent, isCustomEvent=True)
     def OnClientUseShadowEnergy(self, args):
@@ -127,53 +60,6 @@ class ShadowServerSystem(ServerSubsystem):
             item_comp.SetInvItemNum(selectedSlot, new_count)
         self.sendClient(playerId, config.AddShadowEnergyEvent, {"amount": 8})
         print "333"
-
-    @EventListener(config.DamageEvent)
-    def OnDamageEvent(self, args):
-        """玩家受伤事件"""
-        entityId = args.entityId
-        player_list = serverApi.GetPlayerList()
-        if entityId in player_list:
-            print "服务端-玩家已受伤"
-            print args.dict()
-            print entityId
-            self.sendClient(entityId, config.DamageEvent, args.dict())
-
-    @EventListener(config.PlayerAttackEntityEvent)
-    def OnPlayerAttackEvent(self, args):
-        """玩家攻击事件"""
-        playerId = args.playerId
-        player_list = serverApi.GetPlayerList()
-        print "服务端-玩家已攻击"
-        print args.dict()
-        print playerId
-
-    @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
-    def OnClientUpgradeSkill(self, args):
-        """服务端处理客户端升级请求（转发到统一处理方法）"""
-        skill_id = args.skill_id
-        player_id = args.playerId
-
-        if not skill_id or not player_id:
-            return
-
-        # 获取当前等级
-        current_level = self.GetSkillLevel(player_id, skill_id)
-        if current_level >= 5:  # 最高5级
-            return
-
-        # 计算下一级
-        next_level = current_level + 1
-
-        # 获取升级所需碎片数量
-        upgrade_info = self.getUpgradeInfo(skill_id, current_level)
-        if not upgrade_info:
-            return
-
-        fragment_cost = upgrade_info.get("fragment_cost", 0)
-
-        # 调用统一的升级处理方法
-        self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
 
     def ProcessSkillUpgrade(self, player_id, skill_id, fragment_cost, current_level):
         """统一的技能升级处理方法"""
@@ -231,53 +117,6 @@ class ShadowServerSystem(ServerSubsystem):
         data[skill_id] = level
         comp.SetExtraData("skill_levels", data)
 
-    @EventListener(config.ServerUpgradeSkillEvent, isCustomEvent=True)
-    def OnServerUpgradeSkill(self, args):
-        """服务端处理技能升级请求"""
-        skill_id = args.skill_id
-        player_id = args.playerId
-        fragment_cost = args.fragment_cost
-
-        if not skill_id or not player_id:
-            return
-
-        # 获取当前等级
-        current_level = self.GetSkillLevel(player_id, skill_id)
-        if current_level >= 5:  # 最高5级
-            return
-
-        # 调用统一的升级处理方法
-        self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
-
-    @EventListener(config.RequestSkillLevelsEvent, isCustomEvent=True)
-    def OnRequestSkillLevels(self, args):
-        """处理客户端请求技能等级同步"""
-        player_id = args.playerId
-        if not player_id:
-            return
-
-        # 获取所有技能等级
-        skill_levels = {}
-        for skill in config.SKILL_CONFIGS:
-            skill_id = skill["skill_id"]
-            level = self.GetSkillLevel(player_id, skill_id)
-            skill_levels[skill_id] = level
-
-        # 发送给客户端
-        self.sendClient(player_id, config.SyncSkillLevelsEvent, {
-            "skill_levels": skill_levels
-        })
-
-    @EventListener("ServerPlayerTryJoinEvent")
-    def OnPlayerJoin(self, args):
-        """玩家加入游戏时，自动同步技能等级"""
-        print "玩家已加入游戏"
-        player_id = args.playerId
-        if player_id:
-            # 延迟一段时间，确保客户端已准备好
-            time_comp = SCF.CreateGame(levelId)
-            time_comp.AddTimer(1.0, lambda: self.SyncSkillLevelsToPlayer(player_id))
-
     def SyncSkillLevelsToPlayer(self, player_id):
         """向指定玩家同步技能等级"""
         skill_levels = {}
@@ -326,7 +165,7 @@ class ShadowServerSystem(ServerSubsystem):
                 break
 
             item_dict = item_comp.GetPlayerItem(inv_pos, slot)
-            if item_dict and item_dict.get('itemName') == "minecraft:apple":
+            if item_dict and item_dict.get('itemName') == config.SKILL_UPGRADE_CONFIG["fragment_item_id"]:
                 current_count = item_dict.get('count', 0)
                 if current_count > 0:
                     consume = min(current_count, remaining)
@@ -342,3 +181,144 @@ class ShadowServerSystem(ServerSubsystem):
                     remaining -= consume
 
         return remaining == 0
+
+    @EventListener(config.DamageEvent)
+    def OnDamageEvent(self, args):
+        """玩家受伤事件"""
+        entityId = args.entityId
+        player_list = serverApi.GetPlayerList()
+        if entityId in player_list:
+            print "服务端-玩家已受伤"
+            print args.dict()
+            print entityId
+            self.sendClient(entityId, config.DamageEvent, args.dict())
+
+    @EventListener(config.PlayerAttackEntityEvent)
+    def OnPlayerAttackEvent(self, args):
+        """玩家攻击事件"""
+        playerId = args.playerId
+        player_list = serverApi.GetPlayerList()
+        print "服务端-玩家已攻击"
+        print args.dict()
+        print playerId
+
+    @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
+    def OnClientUpgradeSkill(self, args):
+        """服务端处理客户端升级请求（转发到统一处理方法）"""
+        skill_id = args.skill_id
+        player_id = args.playerId
+
+        if not skill_id or not player_id:
+            return
+
+        # 获取当前等级
+        current_level = self.GetSkillLevel(player_id, skill_id)
+        if current_level >= 5:  # 最高5级
+            return
+
+        # 计算下一级
+        next_level = current_level + 1
+
+        # 获取升级所需碎片数量
+        upgrade_info = self.getUpgradeInfo(skill_id, current_level)
+        if not upgrade_info:
+            return
+
+        fragment_cost = upgrade_info.get("fragment_cost", 0)
+
+        # 调用统一的升级处理方法
+        self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
+
+    @EventListener(config.ServerUpgradeSkillEvent, isCustomEvent=True)
+    def OnServerUpgradeSkill(self, args):
+        """服务端处理技能升级请求"""
+        skill_id = args.skill_id
+        player_id = args.playerId
+        fragment_cost = args.fragment_cost
+
+        if not skill_id or not player_id:
+            return
+
+        # 获取当前等级
+        current_level = self.GetSkillLevel(player_id, skill_id)
+        if current_level >= 5:  # 最高5级
+            return
+
+        # 调用统一的升级处理方法
+        self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
+
+    @EventListener(config.RequestSkillLevelsEvent, isCustomEvent=True)
+    def OnRequestSkillLevels(self, args):
+        """处理客户端请求技能等级同步"""
+        player_id = args.playerId
+        if not player_id:
+            return
+
+        # 获取所有技能等级
+        skill_levels = {}
+        for skill in config.SKILL_CONFIGS:
+            skill_id = skill["skill_id"]
+            level = self.GetSkillLevel(player_id, skill_id)
+            skill_levels[skill_id] = level
+
+        # 发送给客户端
+        self.sendClient(player_id, config.SyncSkillLevelsEvent, {
+            "skill_levels": skill_levels
+        })
+
+    @EventListener("ServerPlayerTryJoinEvent")
+    def OnPlayerJoin(self, args):
+        """玩家加入游戏时，自动同步技能等级"""
+        print "玩家已加入游戏"
+        player_id = args.playerId
+        if player_id:
+            # 延迟一段时间，确保客户端已准备好
+            time_comp = SCF.CreateGame(levelId)
+            time_comp.AddTimer(1.0, lambda: self.SyncSkillLevelsToPlayer(player_id))
+
+    @EventListener(config.ServerSkillEvent, isCustomEvent=True)
+    def OnSkillEvent(self, args):
+        """服务端释放技能事件（使用命令）"""
+        skill_id = args.skill
+        player_id = args.playerId
+        item_identifier_used = args.itemIdentifier
+        damage_multiplier = args.damageMultiplier  # 获取伤害乘数
+
+        if not player_id:
+            player_id = serverApi.GetHostPlayerId()
+
+        skill_cfg = self.GetSkillConfig(skill_id)
+        if not skill_cfg:
+            logger.error("未知技能ID: %s" % skill_id)
+            return
+
+        # 确定要执行的命令列表
+        commands_to_execute = []
+        if item_identifier_used and "valid_items" in skill_cfg:
+            for item_config in skill_cfg["valid_items"]:
+                if item_config["item_identifier"] == item_identifier_used:
+                    commands_to_execute = item_config.get("server_commands", [])
+                    break
+
+        # 如果没匹配到，或者没传item_identifier，则执行第一个物品的命令（或可以定义默认行为）
+        if not commands_to_execute and skill_cfg.get("valid_items"):
+            commands_to_execute = skill_cfg["valid_items"][0].get("server_commands", [])
+
+        # 执行命令
+        cmd_comp = serverApi.GetEngineCompFactory().CreateCommand(levelId)
+        for command in commands_to_execute:
+            # 如果命令中包含伤害值，可以在这里进行修改
+            # 例如：/damage @e[r=3,type=!player] 30 entity_attack entity @s
+            if damage_multiplier != 1.0 and "damage" in command:
+                # 提取伤害值并乘以伤害乘数
+                import re
+                # 查找数字
+                numbers = re.findall(r'\d+', command)
+                if numbers:
+                    # 这里需要根据实际情况调整，可能需要更复杂的解析
+                    pass
+            cmd_comp.SetCommand(command, player_id)
+        if skill_id == "RW" and item_identifier_used == "minecraft:arrow":
+            time_comp = SCF.CreateGame(levelId)
+            time_comp.AddTimer(1.0, self.DelayDamage)
+        logger.info("玩家 %s 释放了技能: %s (物品: %s)" % (player_id, skill_id, item_identifier_used or "默认"))

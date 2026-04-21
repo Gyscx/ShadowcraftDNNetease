@@ -21,7 +21,7 @@ ClientUpgradeSkillEvent = "ClientUpgradeSkillEvent"
 ServerUpgradeSkillEvent = "ServerUpgradeSkillEvent"
 UpgradeSkillResultEvent = "UpgradeSkillResultEvent"
 RequestSkillLevelsEvent = "RequestSkillLevelsEvent"
-SyncSkillLevelsEvent = "SyncSkillLevelsEvent"        
+SyncSkillLevelsEvent = "SyncSkillLevelsEvent"
 
 shadowUIName = "shadow_energy"
 shadowUIPyClsPath = "dn_script_shadow.ui.shadowUI.ShadowScreenUI"
@@ -153,7 +153,7 @@ SKILL_STATE = {
 # 技能升级系统配置
 SKILL_UPGRADE_CONFIG = {
     "max_level": 5,  # 最高等级
-    "fragment_item_id": "minecraft:apple",  # 暗影碎片物品ID
+    "fragment_item_id": "sf:shadow_energy",
     "upgrade_effects": {
         "helmet": [
             {"level": 1, "damage_multiplier": 1.0, "cooldown_multiplier": 1.0, "fragment_cost": 0},

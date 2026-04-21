@@ -31,37 +31,39 @@ class ShadowClientSystem(ClientSubsystem):
         # +++ 新增：向服务端请求技能等级同步
         self.SendSkillLevelSyncRequest()
 
+    def onUpdate(self, dt):
+        """每帧更新"""
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        self.SendShadowMessage()
+        if ui_node:
+            # 减少冷却时间，并同步到UI
+            delta = 0.05
+            for skill_id in list(self.skill_cooldowns.keys()):
+                if self.skill_cooldowns[skill_id] > 0.0:
+                    new_time = max(0.0, self.skill_cooldowns[skill_id] - delta)
+                    self.skill_cooldowns[skill_id] = new_time
+                    # 关键同步：将新的冷却时间设置到UI的状态字典中
+                    if skill_id in ui_node.skill_states:
+                        ui_node.skill_states[skill_id]["cooldown_time"] = new_time
+            # 更新UI冷却显示
+            ui_node.UpdateCooldowns()
+            # 更新所有技能按钮状态
+            for skill_cfg in config.SKILL_CONFIGS:
+                skill_id = skill_cfg["skill_id"]
+                has_item = self.CheckItemForSkill(skill_cfg)
+                cooldown_left = self.skill_cooldowns.get(skill_id, 0.0)
+                # 冷却结束后恢复默认状态
+                if cooldown_left <= 0.0:
+                    ui_node.UpdateSkillButtonState(skill_id, has_item)
+                    # +++ 更新升级按钮可见性
+                ui_node.UpdateUpgradeButtonVisibility(skill_id)
+
     def SendSkillLevelSyncRequest(self):
         """向服务端发送技能等级同步请求"""
         player_id = clientApi.GetLocalPlayerId()
         self.sendServer(config.RequestSkillLevelsEvent, {
             "playerId": player_id
         })
-
-    # 文件: shadow_clientSystem.py
-    # 方法: OnSyncSkillLevels
-    # 修改后的代码段
-    @EventListener(config.SyncSkillLevelsEvent, isCustomEvent=True)
-    def OnSyncSkillLevels(self, args):
-        """接收服务端同步的技能等级"""
-        skill_levels = args.skill_levels
-        if skill_levels:
-            self.skill_levels = skill_levels
-            self.saveSkillLevels()  # 保存到本地配置
-            logger.info("从服务端同步技能等级: %s" % skill_levels)
-
-            # +++ 修复点：确保在数据同步后，UI被创建或刷新
-            if not hasattr(self, 'mshadowUINode') or self.mshadowUINode is None:
-                # UI可能尚未创建，此时创建UI
-                clientApi.RegisterUI(config.ModName, config.shadowUIName, config.shadowUIPyClsPath,
-                                     config.shadowUIScreenDef)
-                self.mshadowUINode = clientApi.CreateUI(config.ModName, config.shadowUIName, {"isHud": 1})
-            # 获取UI节点并更新
-            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-            if ui_node:
-                for skill_id, level in skill_levels.items():
-                    ui_node.UpdateSkillLevel(skill_id, level)
-                logger.info("UI技能等级已更新为服务端数据。")
 
     def loadSkillLevels(self):
         """加载技能等级数据"""
@@ -250,32 +252,11 @@ class ShadowClientSystem(ClientSubsystem):
         matched = self.GetMatchedItemConfig(skill_cfg["skill_id"])
         return matched is not None
 
-    @EventListener(config.OnKeyPressInGame)
-    def OnKeyPressInGame(self, args):
-        """处理按键按下事件"""
-        if args.isDown != "1":
-            return
-        key = int(args.key)
-        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-        if not ui_node:
-            return
-        # 确保UI控件已初始化
-        if not hasattr(ui_node, 'mShadowAbility'):
-            return
-        ability_ctrl = ui_node.GetBaseUIControl(ui_node.mShadowAbility)
-        if not ability_ctrl or not ability_ctrl.GetVisible():
-            return
-        # 获取按键映射组件
-        levelId = clientApi.GetLevelId()
-        playerViewComp = clientApi.GetEngineCompFactory().CreatePlayerView(levelId)
-        # 遍历所有技能配置，检查按键匹配
-        for skill_cfg in config.SKILL_CONFIGS:
-            mapped_key = playerViewComp.GetKeyMappings(skill_cfg["key_mapping_name"])
-            if key == mapped_key and self.CheckItemForSkill(skill_cfg):
-                # 触发技能
-                if self.TriggerSkillAbility(skill_cfg["skill_id"]):
-                    ui_node.StartCooldown(skill_cfg["skill_id"])
-                break
+    def SendShadowMessage(self):
+        """获取当前暗影能量数据（当前无实际功能，但保留调用）"""
+        shadow_config = config_comp.GetConfigData("dn_shadow_energy")
+        # 此方法目前无实际操作，但保留以维持原有调用结构
+        pass
 
     def TriggerSkillAbility(self, skill_id):
         """处理玩家释放技能相关逻辑（修改版，应用等级加成）"""
@@ -332,6 +313,33 @@ class ShadowClientSystem(ClientSubsystem):
         render_comp.RebuildPlayerRender()
         # notify_comp.SetLeftCornerNotify("已恢复原版模型")
 
+    @EventListener(config.OnKeyPressInGame)
+    def OnKeyPressInGame(self, args):
+        """处理按键按下事件"""
+        if args.isDown != "1":
+            return
+        key = int(args.key)
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        if not ui_node:
+            return
+        # 确保UI控件已初始化
+        if not hasattr(ui_node, 'mShadowAbility'):
+            return
+        ability_ctrl = ui_node.GetBaseUIControl(ui_node.mShadowAbility)
+        if not ability_ctrl or not ability_ctrl.GetVisible():
+            return
+        # 获取按键映射组件
+        levelId = clientApi.GetLevelId()
+        playerViewComp = clientApi.GetEngineCompFactory().CreatePlayerView(levelId)
+        # 遍历所有技能配置，检查按键匹配
+        for skill_cfg in config.SKILL_CONFIGS:
+            mapped_key = playerViewComp.GetKeyMappings(skill_cfg["key_mapping_name"])
+            if key == mapped_key and self.CheckItemForSkill(skill_cfg):
+                # 触发技能
+                if self.TriggerSkillAbility(skill_cfg["skill_id"]):
+                    ui_node.StartCooldown(skill_cfg["skill_id"])
+                break
+
     @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
     def OnClientUpgradeSkill(self, args):
         """客户端请求升级技能"""
@@ -345,33 +353,6 @@ class ShadowClientSystem(ClientSubsystem):
         ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
         if ui_node:
             ui_node.OnUpgradeResult(skill_id, success)
-
-    def onUpdate(self, dt):
-        """每帧更新"""
-        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-        self.SendShadowMessage()
-        if ui_node:
-            # 减少冷却时间，并同步到UI
-            delta = 0.05
-            for skill_id in list(self.skill_cooldowns.keys()):
-                if self.skill_cooldowns[skill_id] > 0.0:
-                    new_time = max(0.0, self.skill_cooldowns[skill_id] - delta)
-                    self.skill_cooldowns[skill_id] = new_time
-                    # 关键同步：将新的冷却时间设置到UI的状态字典中
-                    if skill_id in ui_node.skill_states:
-                        ui_node.skill_states[skill_id]["cooldown_time"] = new_time
-            # 更新UI冷却显示
-            ui_node.UpdateCooldowns()
-            # 更新所有技能按钮状态
-            for skill_cfg in config.SKILL_CONFIGS:
-                skill_id = skill_cfg["skill_id"]
-                has_item = self.CheckItemForSkill(skill_cfg)
-                cooldown_left = self.skill_cooldowns.get(skill_id, 0.0)
-                # 冷却结束后恢复默认状态
-                if cooldown_left <= 0.0:
-                    ui_node.UpdateSkillButtonState(skill_id, has_item)
-                    # +++ 更新升级按钮可见性
-                ui_node.UpdateUpgradeButtonVisibility(skill_id)
 
     @EventListener(config.UiInitFinishedEvent)
     def OnUIInitFinished(self, args):
@@ -506,8 +487,6 @@ class ShadowClientSystem(ClientSubsystem):
             if ui_node:
                 ui_node.UpdateShadow(new_ratio)
 
-    # 在 shadow_clientSystem.py 中添加
-
     @EventListener(config.UpgradeSkillResultEvent, isCustomEvent=True)
     def OnUpgradeSkillResult(self, args):
         """处理服务端返回的升级结果"""
@@ -558,8 +537,24 @@ class ShadowClientSystem(ClientSubsystem):
             reason = args.reason
             notify_comp.SetLeftCornerNotify("升级失败: %s" % reason)
 
-    def SendShadowMessage(self):
-        """获取当前暗影能量数据（当前无实际功能，但保留调用）"""
-        shadow_config = config_comp.GetConfigData("dn_shadow_energy")
-        # 此方法目前无实际操作，但保留以维持原有调用结构
-        pass
+    @EventListener(config.SyncSkillLevelsEvent, isCustomEvent=True)
+    def OnSyncSkillLevels(self, args):
+        """接收服务端同步的技能等级"""
+        skill_levels = args.skill_levels
+        if skill_levels:
+            self.skill_levels = skill_levels
+            self.saveSkillLevels()  # 保存到本地配置
+            logger.info("从服务端同步技能等级: %s" % skill_levels)
+
+            # +++ 修复点：确保在数据同步后，UI被创建或刷新
+            if not hasattr(self, 'mshadowUINode') or self.mshadowUINode is None:
+                # UI可能尚未创建，此时创建UI
+                clientApi.RegisterUI(config.ModName, config.shadowUIName, config.shadowUIPyClsPath,
+                                     config.shadowUIScreenDef)
+                self.mshadowUINode = clientApi.CreateUI(config.ModName, config.shadowUIName, {"isHud": 1})
+            # 获取UI节点并更新
+            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+            if ui_node:
+                for skill_id, level in skill_levels.items():
+                    ui_node.UpdateSkillLevel(skill_id, level)
+                logger.info("UI技能等级已更新为服务端数据。")
