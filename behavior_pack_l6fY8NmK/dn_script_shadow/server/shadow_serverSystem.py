@@ -371,9 +371,9 @@ class ShadowServerSystem(ServerSubsystem):
         """
         try:
             # 检查实体ID是否有效
-            if entity_id <= 0:
-                logger.warning("尝试为无效的实体ID %s 发送UI绑定通知，操作已取消。" % entity_id)
-                return
+            # if entity_id <= 0:
+            #     logger.warning("尝试为无效的实体ID %s 发送UI绑定通知，操作已取消。" % entity_id)
+            #     return
 
             # 获取所有玩家ID列表
             player_list = serverApi.GetPlayerList()
