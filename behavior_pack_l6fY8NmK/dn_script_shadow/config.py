@@ -22,10 +22,15 @@ ServerUpgradeSkillEvent = "ServerUpgradeSkillEvent"
 UpgradeSkillResultEvent = "UpgradeSkillResultEvent"
 RequestSkillLevelsEvent = "RequestSkillLevelsEvent"
 SyncSkillLevelsEvent = "SyncSkillLevelsEvent"
+ServerSpawnMobEvent = "ServerSpawnMobEvent"
+BindEntityUIEvent = "BindEntityUIEvent"
 
 shadowUIName = "shadow_energy"
+shadowEntityUIName = "shadowEnergyEntity"
 shadowUIPyClsPath = "dn_script_shadow.ui.shadowUI.ShadowScreenUI"
+shadowEntityUIPyClsPath = "dn_script_shadow.ui.shadowEntityUI.ShadowEntityScreenUI"
 shadowUIScreenDef = "shadow_energy.main"
+shadowEntityUIScreenDef = "shadowEnergyEntity.main"
 
 # 技能配置列表 - 核心数据结构
 SKILL_CONFIGS = [
@@ -83,7 +88,6 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "blast",  # 原texture_name字段的值
                 "server_commands": [
-                    "/damage @e[r=3,type=!player] 30 entity_attack entity @s",
                     "/playanimation @s animation.player.eruption",
                     "/camerashake add @s 2 0.1",
                     "/playsound mob.shulker.shoot @s",

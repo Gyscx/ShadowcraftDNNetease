@@ -11,6 +11,7 @@ SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
 levelId = serverApi.GetLevelId()
 
+
 @SubsystemServer
 class ShadowServerSystem(ServerSubsystem):
     def onInit(self):
@@ -284,6 +285,28 @@ class ShadowServerSystem(ServerSubsystem):
         item_identifier_used = args.itemIdentifier
         damage_multiplier = args.damageMultiplier  # 获取伤害乘数
 
+        def DelayCommand():
+            command_list = [
+                "execute as @s at @s positioned ^ ^ ^8 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^7.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^7 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^6.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^6 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^5.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^4.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^4 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^3.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^3 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^2.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^2 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^1.5 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^1 run damage @e[r=3,type=!player] {} entity_attack entity @s",
+                "execute as @s at @s positioned ^ ^ ^0.5 run damage @e[r=3,type=!player] {} entity_attack entity @s"
+            ]
+            for delay_command in command_list:
+                cmd_comp.SetCommand(delay_command.format(int(30 * damage_multiplier)), player_id)
+
         if not player_id:
             player_id = serverApi.GetHostPlayerId()
 
@@ -307,18 +330,156 @@ class ShadowServerSystem(ServerSubsystem):
         # 执行命令
         cmd_comp = serverApi.GetEngineCompFactory().CreateCommand(levelId)
         for command in commands_to_execute:
-            # 如果命令中包含伤害值，可以在这里进行修改
-            # 例如：/damage @e[r=3,type=!player] 30 entity_attack entity @s
-            if damage_multiplier != 1.0 and "damage" in command:
-                # 提取伤害值并乘以伤害乘数
-                import re
-                # 查找数字
-                numbers = re.findall(r'\d+', command)
-                if numbers:
-                    # 这里需要根据实际情况调整，可能需要更复杂的解析
-                    pass
             cmd_comp.SetCommand(command, player_id)
         if skill_id == "RW" and item_identifier_used == "minecraft:arrow":
             time_comp = SCF.CreateGame(levelId)
-            time_comp.AddTimer(1.0, self.DelayDamage)
-        logger.info("玩家 %s 释放了技能: %s (物品: %s)" % (player_id, skill_id, item_identifier_used or "默认"))
+            time_comp.AddTimer(1.0, DelayCommand)
+            if skill_id == "armor" and item_identifier_used == "sf:burden_of_loneliness":
+                cmd_comp.SetCommand(
+                    "/damage @e[r=3,type=!player] {} entity_attack entity @s".format(int(30 * damage_multiplier)),
+                    player_id)
+                print "12345"
+
+            logger.info("玩家 %s 释放了技能: %s (物品: %s)" % (player_id, skill_id, item_identifier_used or "默认"))
+
+    @EventListener("ServerSpawnMobEvent")
+    def OnServerSpawnMob(self, args):
+        """服务端生成生物事件"""
+        print "服务端生成生物事件"
+        print args.dict()
+
+        try:
+            # 获取生成的生物信息
+            entity_id = args.entityId
+            identifier = args.identifier
+
+            print "生成的生物ID: %s, 类型: %s" % (entity_id, identifier)
+
+            # 检查是否为需要绑定UI的生物类型
+            # 这里可以根据需要修改条件
+            if identifier.find("minecraft") != -1:
+                print "为生物 %s (%s) 发送UI绑定通知" % (entity_id, identifier)
+                self.NotifyClientToBindUI(entity_id)
+
+        except Exception as e:
+            logger.error("OnServerSpawnMob error: %s" % str(e))
+            print "OnServerSpawnMob error: %s" % str(e)
+
+    def NotifyClientToBindUI(self, entity_id):
+        """
+        通知客户端为实体绑定UI
+        """
+        try:
+            # 检查实体ID是否有效
+            if entity_id <= 0:
+                logger.warning("尝试为无效的实体ID %s 发送UI绑定通知，操作已取消。" % entity_id)
+                return
+
+            # 获取所有玩家ID列表
+            player_list = serverApi.GetPlayerList()
+
+            event_data = {
+                "entityId": entity_id,  # 传递整数类型的entityId
+                "uiName": config.shadowEntityUIName
+            }
+
+            # 关键修改：延迟发送事件，确保客户端已加载该实体
+            for player_id in player_list:
+                # 为每个玩家创建一个延迟任务
+                time_comp = SCF.CreateGame(levelId)
+                # 延迟0.5秒发送，可根据实际情况调整
+                time_comp.AddTimer(0.5,
+                                   lambda pid=player_id, eid=entity_id, ed=event_data: self._delayedBindNotify(pid, eid,
+                                                                                                               ed))
+
+            logger.info("已调度实体 %s 的UI绑定通知，将在0.5秒后发送给客户端。" % entity_id)
+
+        except Exception as e:
+            logger.error("NotifyClientToBindUI error: %s" % str(e))
+
+    def _delayedBindNotify(self, player_id, entity_id, event_data):
+        """
+        延迟发送绑定通知的内部方法
+        """
+        # 延迟后再次检查实体是否仍然存在（可选，但更安全）
+        try:
+            comp = serverApi.GetEngineCompFactory().CreatePos(entity_id)
+            if comp is None:
+                logger.error("延迟检查：实体 %s 已不存在，取消UI绑定通知。" % entity_id)
+                return
+        except:
+            logger.error("延迟检查：实体 %s 无效，取消UI绑定通知。" % entity_id)
+            return
+
+        # 发送事件
+        self.sendClient(player_id, config.BindEntityUIEvent, event_data)
+        logger.info("已向玩家 %s 发送实体 %s 的UI绑定事件。" % (player_id, entity_id))
+
+    @EventListener("DamageEvent")
+    def OnEntityHurtEvent(self, args):
+        """
+        实体受伤事件 - 实体被玩家攻击
+        """
+        try:
+            # 从事件参数中获取数据
+            hurt_entity_id = args.entityId
+            attacker_id = args.srcId  # DamageEvent中攻击者参数是srcId
+
+            if not hurt_entity_id or not attacker_id:
+                return
+
+            # 检查攻击者是否是玩家
+            player_list = serverApi.GetPlayerList()
+            if attacker_id in player_list:
+                # 检查受伤实体是否是玩家（避免玩家攻击玩家也触发）
+                if hurt_entity_id not in player_list:
+                    # 实体被玩家攻击，为该实体增加10点暗影能量
+                    logger.info("实体 %s 被玩家 %s 攻击，增加暗影能量" % (hurt_entity_id, attacker_id))
+                    self.SendShadowEnergyToEntity(hurt_entity_id, 10)
+
+        except Exception as e:
+            logger.error("DamageEvent error: %s" % str(e))
+
+    @EventListener("PlayerHurtEvent")
+    def OnPlayerHurtEvent(self, args):
+        """
+        玩家受伤事件 - 玩家被实体攻击
+        """
+        try:
+            # 从事件参数中获取数据
+            hurt_player_id = args.id  # PlayerHurtEvent中受伤玩家参数是id
+            attacker_id = args.attacker  # PlayerHurtEvent中攻击者参数是attacker
+
+            if not hurt_player_id or not attacker_id:
+                return
+
+            # 检查攻击者是否是实体（非玩家）
+            player_list = serverApi.GetPlayerList()
+            if attacker_id not in player_list:
+                # 玩家被实体攻击，为该攻击实体增加5点暗影能量
+                logger.info("玩家 %s 被实体 %s 攻击，为实体增加暗影能量" % (hurt_player_id, attacker_id))
+                self.SendShadowEnergyToEntity(attacker_id, 5)
+
+        except Exception as e:
+            logger.error("PlayerHurtEvent error: %s" % str(e))
+
+    def SendShadowEnergyToEntity(self, entity_id, amount):
+        """
+        为指定实体发送暗影能量增加事件
+        注意：需要将事件发送给所有玩家，因为任何玩家都可能看到这个实体的UI
+        """
+        try:
+            # 获取所有在线玩家
+            player_list = serverApi.GetPlayerList()
+
+            for player_id in player_list:
+                # 向每个玩家发送事件，让他们的客户端更新该实体的暗影能量
+                self.sendClient(player_id, config.AddShadowEnergyEvent, {
+                    "amount": amount,
+                    "entityId": entity_id
+                })
+
+            logger.info("为实体 %s 发送 %s 点暗影能量给所有玩家" % (entity_id, amount))
+
+        except Exception as e:
+            logger.error("SendShadowEnergyToEntity error: %s" % str(e))

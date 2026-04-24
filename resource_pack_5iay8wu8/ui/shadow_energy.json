@@ -129,14 +129,14 @@
                                                 {
                                                     "level_label": {
                                                         "type": "label",
-                                                        "anchor_from": "top_middle",
-                                                        "anchor_to": "top_middle",
+                                                        "anchor_from": "top_left",
+                                                        "anchor_to": "top_left",
                                                         "offset": [
-                                                            "0%+0px",
-                                                            "-8px"
+                                                            -3.0,
+                                                            0.0
                                                         ],
                                                         "size": [
-                                                            20.0,
+                                                            15.0,
                                                             10.0
                                                         ],
                                                         "layer": 1,
@@ -181,7 +181,7 @@
                                                     "upgrade_button@common.button": {
                                                         "type": "button",
                                                         "$control_alpha": 1.0,
-                                                        "$default_texture": "textures/ui/blast_button_hover",
+                                                        "$default_texture": "textures/ui/upgrade_button",
                                                         "$hover_texture": "textures/netease/common/button/hover",
                                                         "$is_new_nine_slice": false,
                                                         "$label_color": [
@@ -208,12 +208,12 @@
                                                             0
                                                         ],
                                                         "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                                        "$pressed_texture": "textures/ui/blast_button_pressed",
+                                                        "$pressed_texture": "textures/ui/upgrade_button",
                                                         "$texture_layer": 2,
                                                         "anchor_from": "top_right",
                                                         "anchor_to": "top_right",
                                                         "offset": [
-                                                            15.0,
+                                                            13.0,
                                                             0.0
                                                         ],
                                                         "size": [
@@ -329,7 +329,7 @@
                                                     "upgrade_button@common.button": {
                                                         "type": "button",
                                                         "$control_alpha": 1.0,
-                                                        "$default_texture": "textures/ui/blast_button_hover",
+                                                        "$default_texture": "textures/ui/upgrade_button",
                                                         "$hover_texture": "textures/netease/common/button/hover",
                                                         "$is_new_nine_slice": false,
                                                         "$label_color": [
@@ -356,12 +356,12 @@
                                                             0
                                                         ],
                                                         "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                                        "$pressed_texture": "textures/ui/blast_button_pressed",
+                                                        "$pressed_texture": "textures/ui/upgrade_button",
                                                         "$texture_layer": 2,
                                                         "anchor_from": "top_right",
                                                         "anchor_to": "top_right",
                                                         "offset": [
-                                                            15.0,
+                                                            13.0,
                                                             0.0
                                                         ],
                                                         "size": [
@@ -400,14 +400,14 @@
                                                 {
                                                     "level_label": {
                                                         "type": "label",
-                                                        "anchor_from": "top_middle",
-                                                        "anchor_to": "top_middle",
+                                                        "anchor_from": "top_left",
+                                                        "anchor_to": "top_left",
                                                         "offset": [
-                                                            "0%+0px",
-                                                            "-8px"
+                                                            -3.0,
+                                                            0.0
                                                         ],
                                                         "size": [
-                                                            20.0,
+                                                            15.0,
                                                             10.0
                                                         ],
                                                         "layer": 20,
@@ -508,7 +508,7 @@
                                                     "upgrade_button@common.button": {
                                                         "type": "button",
                                                         "$control_alpha": 1.0,
-                                                        "$default_texture": "textures/ui/blast_button_hover",
+                                                        "$default_texture": "textures/ui/upgrade_button",
                                                         "$hover_texture": "textures/netease/common/button/hover",
                                                         "$is_new_nine_slice": false,
                                                         "$label_color": [
@@ -535,12 +535,12 @@
                                                             0
                                                         ],
                                                         "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                                        "$pressed_texture": "textures/ui/blast_button_pressed",
+                                                        "$pressed_texture": "textures/ui/upgrade_button",
                                                         "$texture_layer": 2,
                                                         "anchor_from": "top_right",
                                                         "anchor_to": "top_right",
                                                         "offset": [
-                                                            15.0,
+                                                            13.0,
                                                             0.0
                                                         ],
                                                         "size": [
@@ -579,14 +579,14 @@
                                                 {
                                                     "level_label": {
                                                         "type": "label",
-                                                        "anchor_from": "top_middle",
-                                                        "anchor_to": "top_middle",
+                                                        "anchor_from": "top_left",
+                                                        "anchor_to": "top_left",
                                                         "offset": [
-                                                            "0%+0px",
-                                                            "-8px"
+                                                            -3.0,
+                                                            0.0
                                                         ],
                                                         "size": [
-                                                            20.0,
+                                                            15.0,
                                                             10.0
                                                         ],
                                                         "layer": 20,
@@ -687,7 +687,7 @@
                                                     "upgrade_button@common.button": {
                                                         "type": "button",
                                                         "$control_alpha": 1.0,
-                                                        "$default_texture": "textures/ui/blast_button_hover",
+                                                        "$default_texture": "textures/ui/upgrade_button",
                                                         "$hover_texture": "textures/netease/common/button/hover",
                                                         "$is_new_nine_slice": false,
                                                         "$label_color": [
@@ -714,12 +714,12 @@
                                                             0
                                                         ],
                                                         "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                                        "$pressed_texture": "textures/ui/blast_button_pressed",
+                                                        "$pressed_texture": "textures/ui/upgrade_button",
                                                         "$texture_layer": 2,
                                                         "anchor_from": "top_right",
                                                         "anchor_to": "top_right",
                                                         "offset": [
-                                                            15.0,
+                                                            13.0,
                                                             0.0
                                                         ],
                                                         "size": [
@@ -758,14 +758,14 @@
                                                 {
                                                     "level_label": {
                                                         "type": "label",
-                                                        "anchor_from": "top_middle",
-                                                        "anchor_to": "top_middle",
+                                                        "anchor_from": "top_left",
+                                                        "anchor_to": "top_left",
                                                         "offset": [
-                                                            "0%+0px",
-                                                            "-8px"
+                                                            "0%+-3px",
+                                                            0.0
                                                         ],
                                                         "size": [
-                                                            20.0,
+                                                            15.0,
                                                             10.0
                                                         ],
                                                         "layer": 20,
@@ -829,13 +829,14 @@
                                 "anchor_to": "center",
                                 "offset": [
                                     0.0,
-                                    6.5
+                                    -9.5
                                 ],
                                 "size": [
                                     150.0,
-                                    90.0
+                                    100.0
                                 ],
                                 "layer": 90,
+                                "visible": false,
                                 "controls": [
                                     {
                                         "cost_label": {
@@ -844,17 +845,17 @@
                                             "anchor_to": "top_middle",
                                             "offset": [
                                                 "0%+0px",
-                                                28.0
+                                                26.0
                                             ],
                                             "size": [
                                                 140.0,
-                                                30.0
+                                                40.0
                                             ],
                                             "layer": 1,
                                             "color": [
-                                                1.0,
-                                                0.8,
-                                                0.2
+                                                1,
+                                                1,
+                                                1
                                             ],
                                             "font_type": "default",
                                             "text": "#upgrade_cost_text",
@@ -896,8 +897,8 @@
                                         "cancel_button@common.button": {
                                             "type": "button",
                                             "$control_alpha": 1.0,
-                                            "$default_texture": "textures/netease/common/button/default",
-                                            "$hover_texture": "textures/netease/common/button/hover",
+                                            "$default_texture": "textures/ui/shadow_dialog_button",
+                                            "$hover_texture": "textures/ui/shadow_dialog_button_hover",
                                             "$is_new_nine_slice": false,
                                             "$label_color": [
                                                 1,
@@ -917,23 +918,23 @@
                                             "$nine_slice_right": 0,
                                             "$nine_slice_top": 0,
                                             "$nineslice_size": [
-                                                0,
-                                                0,
-                                                0,
-                                                0
+                                                1.0,
+                                                1.0,
+                                                1.0,
+                                                1.0
                                             ],
                                             "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                            "$pressed_texture": "textures/netease/common/button/pressed",
+                                            "$pressed_texture": "textures/ui/shadow_dialog_button_pressed",
                                             "$texture_layer": 2,
                                             "anchor_from": "bottom_right",
                                             "anchor_to": "bottom_right",
                                             "offset": [
-                                                "0%+-15px",
-                                                "0%+-5px"
+                                                -5.0,
+                                                -4.0
                                             ],
                                             "size": [
-                                                40.0,
-                                                20.0
+                                                68.0,
+                                                18.0
                                             ],
                                             "layer": 3,
                                             "button_mappings": [],
@@ -950,13 +951,49 @@
                                             ],
                                             "controls": [
                                                 {
-                                                    "default@netease_editor_template_namespace.default": {}
+                                                    "default@netease_editor_template_namespace.default": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
-                                                    "hover@netease_editor_template_namespace.hover": {}
+                                                    "hover@netease_editor_template_namespace.hover": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
-                                                    "pressed@netease_editor_template_namespace.pressed": {}
+                                                    "pressed@netease_editor_template_namespace.pressed": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
                                                     "button_label@netease_editor_template_namespace.button_label": {}
@@ -968,8 +1005,8 @@
                                         "confirm_button@common.button": {
                                             "type": "button",
                                             "$control_alpha": 1.0,
-                                            "$default_texture": "textures/netease/common/button/default",
-                                            "$hover_texture": "textures/netease/common/button/hover",
+                                            "$default_texture": "textures/ui/shadow_dialog_button",
+                                            "$hover_texture": "textures/ui/shadow_dialog_button_hover",
                                             "$is_new_nine_slice": false,
                                             "$label_color": [
                                                 1,
@@ -989,23 +1026,23 @@
                                             "$nine_slice_right": 0,
                                             "$nine_slice_top": 0,
                                             "$nineslice_size": [
-                                                0,
-                                                0,
-                                                0,
-                                                0
+                                                1.0,
+                                                1.0,
+                                                1.0,
+                                                1.0
                                             ],
                                             "$pressed_button_name": "%netease_editor_template_namespace.click",
-                                            "$pressed_texture": "textures/netease/common/button/pressed",
+                                            "$pressed_texture": "textures/ui/shadow_dialog_button_pressed",
                                             "$texture_layer": 2,
                                             "anchor_from": "bottom_left",
                                             "anchor_to": "bottom_left",
                                             "offset": [
-                                                "0%+15px",
-                                                "0%+-5px"
+                                                5.0,
+                                                -4.0
                                             ],
                                             "size": [
-                                                40.0,
-                                                20.0
+                                                68.0,
+                                                18.0
                                             ],
                                             "layer": 4,
                                             "button_mappings": [],
@@ -1022,13 +1059,49 @@
                                             ],
                                             "controls": [
                                                 {
-                                                    "default@netease_editor_template_namespace.default": {}
+                                                    "default@netease_editor_template_namespace.default": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
-                                                    "hover@netease_editor_template_namespace.hover": {}
+                                                    "hover@netease_editor_template_namespace.hover": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
-                                                    "pressed@netease_editor_template_namespace.pressed": {}
+                                                    "pressed@netease_editor_template_namespace.pressed": {
+                                                        "is_new_nine_slice": false,
+                                                        "nine_slice_buttom": 0,
+                                                        "nine_slice_left": 0,
+                                                        "nine_slice_right": 0,
+                                                        "nine_slice_top": 0,
+                                                        "nineslice_size": [
+                                                            4,
+                                                            4,
+                                                            4,
+                                                            4
+                                                        ]
+                                                    }
                                                 },
                                                 {
                                                     "button_label@netease_editor_template_namespace.button_label": {}
@@ -1037,26 +1110,64 @@
                                         }
                                     },
                                     {
-                                        "upgradeP_image": {
+                                        "upgradeP_imageTop": {
                                             "type": "image",
+                                            "anchor_from": "top_middle",
+                                            "anchor_to": "top_middle",
                                             "size": [
                                                 150.0,
-                                                90.0
+                                                19.0
                                             ],
+                                            "layer": 1,
                                             "clip_direction": "left",
                                             "clip_ratio": 0.0,
                                             "color": [
-                                                0.3215686274509804,
-                                                0.611764705882353,
-                                                0.6431372549019608
+                                                0.9411764705882353,
+                                                0.9411764705882353,
+                                                0.9411764705882353
                                             ],
                                             "nineslice_size": [
-                                                1.0,
-                                                1.0,
-                                                1.0,
+                                                2.0,
+                                                2.0,
+                                                2.0,
                                                 1.0
                                             ],
-                                            "texture": "textures/netease/download/bg01@3x"
+                                            "texture": "textures/ui/shadow_dialog_background_top"
+                                        }
+                                    },
+                                    {
+                                        "upgradeP_imageCenter": {
+                                            "type": "image",
+                                            "size": [
+                                                150.0,
+                                                70.0
+                                            ],
+                                            "nineslice_size": [
+                                                8.0,
+                                                4.0,
+                                                8.0,
+                                                4.0
+                                            ],
+                                            "texture": "textures/ui/shadow_dialog_background_center"
+                                        }
+                                    },
+                                    {
+                                        "upgradeP_imageButtom": {
+                                            "type": "image",
+                                            "anchor_from": "bottom_middle",
+                                            "anchor_to": "bottom_middle",
+                                            "size": [
+                                                150.0,
+                                                25.0
+                                            ],
+                                            "layer": 1,
+                                            "nineslice_size": [
+                                                2.0,
+                                                1.0,
+                                                2.0,
+                                                2.0
+                                            ],
+                                            "texture": "textures/ui/shadow_dialog_background_bottom"
                                         }
                                     }
                                 ]

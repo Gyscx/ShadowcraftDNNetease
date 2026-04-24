@@ -42,10 +42,10 @@ class ShadowScreenUI(ScreenNode):
         self.upgrade_cost_text = ""
 
         # 绑定升级相关变量
-        self.helmet_level_text = "LV1"
-        self.armor_level_text = "LV1"
-        self.weapon_level_text = "LV1"
-        self.RW_level_text = "LV1"
+        self.helmet_level_text = "Lv1"
+        self.armor_level_text = "Lv1"
+        self.weapon_level_text = "Lv1"
+        self.RW_level_text = "Lv1"
 
         # 初始化技能状态
         for skill in config.SKILL_CONFIGS:
@@ -124,7 +124,7 @@ class ShadowScreenUI(ScreenNode):
             for skill_id, level in self.skill_levels.items():
                 level_text_attr = "%s_level_text" % skill_id
                 if hasattr(self, level_text_attr):
-                    setattr(self, level_text_attr, "LV%s" % level)
+                    setattr(self, level_text_attr, "Lv%s" % level)
         # 更新所有技能按钮状态
         self.UpdateAllSkillButtons()
         self.UpdateAbilityVisibility()
@@ -239,9 +239,6 @@ class ShadowScreenUI(ScreenNode):
             # 直接调用UpdateSkillButtonState，传入has_item=True，因为能释放技能肯定持有物品
             self.UpdateSkillButtonState(skill_id, True)
 
-    # 文件: shadowUI.py
-    # 方法: UpdateCooldowns
-    # 修改后的代码段
     def UpdateCooldowns(self):
         """更新所有技能的冷却显示"""
         for skill_id, state in self.skill_states.items():
@@ -361,27 +358,27 @@ class ShadowScreenUI(ScreenNode):
         next_level = upgrade_info["level"]
 
         # 构建升级信息文本
-        cost_text = "升级到 LV%s" % next_level
+        cost_text = "§6升级到 §e§lLv%s§r" % next_level
         fragment_cost = upgrade_info.get("fragment_cost", 0)
 
         if fragment_cost > 0:
             fragment_count = client_sys.getFragmentCount()
-            cost_text += "，需要暗影能量: %d" % fragment_cost
-            cost_text += "\n当前拥有: %d" % fragment_count
+            cost_text += " §r§6需要暗影能量: §e§l%d§r" % fragment_cost
+            cost_text += "\n§6当前拥有: §e§l%d§r" % fragment_count
 
             if fragment_count < fragment_cost:
-                cost_text += " §c(不足)§f"
+                cost_text += " §c§l(不足)§r"
             else:
-                cost_text += " §a(足够)§f"
+                cost_text += " §a§l(足够)§r"
 
         # 显示升级效果
-        damage_bonus = int((upgrade_info.get("damage_multiplier", 1.0) - 1.0) * 100)
-        cooldown_reduction = int((1.0 - upgrade_info.get("cooldown_multiplier", 1.0)) * 100)
-
+        damage_bonus = (upgrade_info.get("damage_multiplier", 1.0) - 1.0) * 30
+        cooldown_reduction = float((1.0 - upgrade_info.get("cooldown_multiplier")) * 5)
+        print cooldown_reduction
         if damage_bonus > 0:
-            cost_text += "\n§a伤害增加: +%d%%§f" % damage_bonus
+            cost_text += "\n§a造成伤害: §l+%.1f§r" % damage_bonus
         if cooldown_reduction > 0:
-            cost_text += "§a，冷却减少: -%d%%§f" % cooldown_reduction
+            cost_text += " §a冷却时间: §l-%.1f秒§r" % cooldown_reduction
 
         self.upgrade_cost_text = cost_text
 
@@ -439,7 +436,7 @@ class ShadowScreenUI(ScreenNode):
         # 更新绑定变量
         level_text_attr = "%s_level_text" % skill_id
         if hasattr(self, level_text_attr):
-            setattr(self, level_text_attr, "LV%s" % level)
+            setattr(self, level_text_attr, "Lv%s" % level)
 
         # 更新UI控件可见性
         self.UpdateUpgradeButtonVisibility(skill_id)

@@ -1,0 +1,99 @@
+{
+    "main": {
+        "type": "screen",
+        "controls": [
+            {
+                "shadowPanel": {
+                    "type": "panel",
+                    "offset": [0, 0],
+                    "layer": 1,
+                    "clip_offset": [
+                        0.0,
+                        0.0
+                    ],
+                    "controls": [
+                        {
+                            "progress_bar": {
+                                "type": "panel",
+                                "$clip_direction": "left",
+                                "$clip_ratio": 0.0,
+                                "$is_new_nine_slice": false,
+                                "$nine_slice_buttom": 0,
+                                "$nine_slice_left": 0,
+                                "$nine_slice_right": 0,
+                                "$nine_slice_top": 0,
+                                "$nineslice_size": [
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                ],
+                                "$progress_bar_empty_texture": "textures/ui/empty_shadow_progress_bar",
+                                "$progress_bar_filled_texture": "textures/ui/filled_shadow_progress_bar",
+                                "$shadow": 0,
+                                "anchor_from": "bottom_middle",
+                                "anchor_to": "bottom_middle",
+                                "offset": [
+                                    "0%",
+                                    "-20%"
+                                ],
+                                "size": [
+                                    "90%",
+                                    "10%"
+                                ],
+                                "layer": 1,
+                                "controls": [
+                                    {
+                                        "empty_progress_bar@netease_editor_template_namespace.empty_progress_bar": {}
+                                    },
+                                    {
+                                        "filled_progress_bar@netease_editor_template_namespace.filled_progress_bar": {
+                                            "bindings": [
+                                                {
+                                                    "binding_condition": "always",
+                                                    "binding_name": "#entity_shadow",
+                                                    "binding_name_override": "#clip_ratio"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "shadow_data": {
+                                "type": "label",
+                                "anchor_from": "bottom_middle",
+                                "anchor_to": "bottom_middle",
+                                "offset": [
+                                    "0%",
+                                    "-25%"
+                                ],
+                                "size": [
+                                    "90%",
+                                    "10%"
+                                ],
+                                "layer": 89,
+                                "color": [
+                                    0.203921568627451,
+                                    0.7058823529411765,
+                                    0.7333333333333333
+                                ],
+                                "font_type": "default",
+                                "text": "#shadow_data_entity",
+                                "text_alignment": "center",
+                                "bindings": [
+                                    {
+                                        "binding_condition": "always",
+                                        "binding_name": "#shadow_data_entity"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "namespace": "shadowEnergyEntity"
+}
