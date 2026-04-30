@@ -1,4 +1,4 @@
-from ...architect.comapct import Plugin, PluginBase
+from ...architect.compact import Plugin, PluginBase
 
 @Plugin(
     'SFDN_Plugin',

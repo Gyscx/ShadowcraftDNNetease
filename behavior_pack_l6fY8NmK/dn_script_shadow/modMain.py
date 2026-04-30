@@ -7,10 +7,10 @@ from .architect.conf import conf
 class ModBase(object):
     @Mod.InitServer()
     def initServer(self):
-        from .architect.comapct import createServer
+        from .architect.compact import createServer
         createServer()
 
     @Mod.InitClient()
     def initClient(self):
-        from .architect.comapct import createClient
+        from .architect.compact import createClient
         createClient()

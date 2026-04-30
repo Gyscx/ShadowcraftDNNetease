@@ -4,8 +4,8 @@ import mod.server.extraServerApi as serverApi
 from mod_log import logger
 from .. import config
 
-from ..architect.comapct import ServerSubsystem, SubsystemServer
-from ..architect.comapct import EventListener
+from ..architect.compact import ServerSubsystem, SubsystemServer
+from ..architect.compact import EventListener
 
 SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
