@@ -1,6 +1,6 @@
 from ..conf import COMPONENT_NAMESPACE, COMPONENT_TAG, PERSIST_INFO
 from ..core.annotation import AnnotationHelper
-from ..core.basic import isServer, clientApi, serverApi
+from ..core.basic import isServer, clientApi, serverApi, levelId
 from ..persistent.client import ClientKVDatabase, ClientKVDatabaseGlobal
 from ..persistent.server import ServerKVDatabase
 from ..core.loader import _notifyRegisterComponent
@@ -9,12 +9,10 @@ from .common import _nativeCompGet
 clientCompCls = []
 serverCompCls = []
 components = {}
-singletonServer = serverApi.GetLevelId()
-singletonClient = clientApi.GetLevelId()
 
 
 def singletonId():
-    return singletonServer if isServer() else singletonClient
+    return levelId()
 
 
 def _registerComponent(isServer, cls, persist=False, singleton=False):
@@ -52,7 +50,10 @@ def _registerCompsIntoGame(isHost):
     _notifyRegisterComponent(clsList)
     for cls in clsList:
         result = api.RegisterComponent(COMPONENT_NAMESPACE, cls.__name__, cls.__module__ + '.' + cls.__name__)
-        print('[INFO] Register {} component'.format('server' if isHost else 'client'), cls.__name__, 'result:', result)
+        if result:
+            print('[INFO] Registered {} component "{}"'.format('server' if isHost else 'client', cls.__name__))
+        else:
+            print('[ERROR] Failed to register {} component "{}"'.format('server' if isHost else 'client', cls.__name__))
 
 
 def getComponentAnnotation(cls):
@@ -122,6 +123,8 @@ def _handlePersistKeys(comp, entityId):
 
 def createComponent(entityId, cls):
     # type: (str, type|str) -> object
+    if not entityId:
+        raise ValueError('entityId is empty')
     api = serverApi if isServer() else clientApi
     compKey = cls if type(cls) == str else cls.__name__
     comp = api.CreateComponent(entityId, COMPONENT_NAMESPACE, compKey)
@@ -166,6 +169,8 @@ def getOneComponent(entityId, cls):
     comps = getComponent(entityId, [cls])
     if comps and len(comps) > 0:
         return comps[0]
+    if 1 > 2:
+        return cls()
 
 
 def getOneSingletonComponent(cls):

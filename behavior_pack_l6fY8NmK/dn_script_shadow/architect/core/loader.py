@@ -136,9 +136,11 @@ def _loadPlugins(manager):
     for _name, _host in registerList.items():
         try:
             _host.load(manager)
-            print('[INFO] Loaded plugin: ' + _host.name)
+            print('[INFO] Loaded plugin: ' + _host.name + ' by ' + _host.author + '\n' + _host.desc)
         except Exception as e:
             print('[ERROR] Failed to load plugin ' + _name)
+
+def _readyPlugins(manager):
     for _host in _plugins().values():
         try:
             _host.onReady(manager)
@@ -177,3 +179,7 @@ def modConf():
         else:
             return None
     return getter
+
+def animMeta(animName):
+    from ...assets.animMeta import AnimMeta
+    return AnimMeta[animName]

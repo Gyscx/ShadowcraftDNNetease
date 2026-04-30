@@ -545,9 +545,15 @@ class PersonaRendererComponent(BaseCompClient):
 
     def changeRenderConf(self, jsonObject, broadcast=True, full=False):
         if compClient.CreateEngineType(self.entityId).GetEngineType() == EntityType.Player:
-            self.changePlayerRenderConf(jsonObject, broadcast=broadcast, full=full)
+            self.changePlayerRenderConf(jsonObject, full, broadcast)
         else:
-            self.changeActorRenderConf(jsonObject, broadcast=broadcast, full=full) 
+            self.changeActorRenderConf(jsonObject, full, broadcast) 
+
+    def addRenderConf(self, jsonObject, rebuild=True):
+        if compClient.CreateEngineType(self.entityId).GetEngineType() == EntityType.Player:
+            self.addPlayerRenderConf(jsonObject, rebuild)
+        else:
+            self.addActorRenderConf(jsonObject, rebuild)
 
     def resetActorRenderConf(self, broadcast=True):
         if not self.modified:
@@ -642,7 +648,7 @@ class PersonaEventsSubsystem(ClientSubsystem):
             return
         personaRenderer = getPersona(event.id) # type: PersonaRendererComponent
         if personaRenderer:
-            personaRenderer.changeRenderConf(event.data, False)
+            personaRenderer.changeRenderConf(event.data, False, full=True)
 
     @EventListener('PersonaResetServer', isCustomEvent=True)
     def onPersonaResetServer(self, event):
