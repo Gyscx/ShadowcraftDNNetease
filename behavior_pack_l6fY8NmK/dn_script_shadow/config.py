@@ -24,6 +24,9 @@ RequestSkillLevelsEvent = "RequestSkillLevelsEvent"
 SyncSkillLevelsEvent = "SyncSkillLevelsEvent"
 ServerSpawnMobEvent = "ServerSpawnMobEvent"
 BindEntityUIEvent = "BindEntityUIEvent"
+UpdateEntityShadowEvent = "UpdateEntityShadowEvent"  # 服务器->客户端：更新实体暗影能量
+RequestEntityShadowDataEvent = "RequestEntityShadowDataEvent"  # 客户端->服务器：请求实体数据
+ResponseEntityShadowDataEvent = "ResponseEntityShadowDataEvent"  # 服务器->客户端：响应实体数据
 
 shadowUIName = "shadow_energy"
 shadowEntityUIName = "shadowEnergyEntity"

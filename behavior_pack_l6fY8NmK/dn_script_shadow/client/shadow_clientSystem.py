@@ -30,8 +30,7 @@ class ShadowClientSystem(ClientSubsystem):
         self.loadSkillLevels()
 
         # +++ 新增：实体独立的暗影能量数据存储
-        self.entity_shadow_data = {}  # entity_id -> {"clip_ratio": float, "shadow_data": int, "is_full": bool}
-
+        self.entity_shadow_data = {}  # 清空所有数据，从头开始
         # +++ 新增：实体UI节点映射
         self.entity_ui_nodes = {}  # entity_id -> ui_node
 
@@ -46,7 +45,7 @@ class ShadowClientSystem(ClientSubsystem):
 
         if ui_node:
             # 减少冷却时间，并同步到UI
-            delta = 0.05
+            delta = dt
             for skill_id in list(self.skill_cooldowns.keys()):
                 if self.skill_cooldowns[skill_id] > 0.0:
                     new_time = max(0.0, self.skill_cooldowns[skill_id] - delta)
@@ -68,20 +67,6 @@ class ShadowClientSystem(ClientSubsystem):
                     ui_node.UpdateSkillButtonState(skill_id, has_item)
                 # 更新升级按钮可见性
                 ui_node.UpdateUpgradeButtonVisibility(skill_id)
-
-        # 删除以下代码，避免每帧刷新实体UI
-        # +++ 新增：更新所有实体UI
-        # for entity_id, ui_node in list(self.entity_ui_nodes.items()):
-        #     if ui_node and hasattr(ui_node, 'UpdateShadow'):
-        #         # 获取该实体的数据
-        #         entity_data = self.getEntityShadowData(entity_id)
-        #         if entity_data:
-        #             try:
-        #                 ui_node.UpdateShadow(entity_data["clip_ratio"])
-        #             except Exception as e:
-        #                 logger.error("更新实体 %s UI失败: %s" % (entity_id, str(e)))
-        #                 # 如果UI节点失效，从映射中移除
-        #                 del self.entity_ui_nodes[entity_id]
 
     def SendSkillLevelSyncRequest(self):
         """向服务端发送技能等级同步请求"""
@@ -409,11 +394,6 @@ class ShadowClientSystem(ClientSubsystem):
         # 注册实体头顶UI
         if not self.ui_registered:
             success = clientApi.RegisterUI(config.ModName, config.shadowEntityUIName, config.shadowEntityUIPyClsPath, config.shadowEntityUIScreenDef)
-            # self.mshadowEntityUINode = clientApi.CreateUI(config.ModName, config.shadowEntityUIName, {
-            #         "bindEntityId": playerId,
-            #         "bindOffset": (0, 2, 0),  # UI在实体头顶的偏移量
-            #         "autoScale": 1  # 开启自动缩放
-            #     })
             self.mshadowEntityUINode = clientApi.GetUI(config.ModName, config.shadowEntityUIName)
             if success:
                 logger.info("实体头顶UI注册成功")
@@ -425,6 +405,27 @@ class ShadowClientSystem(ClientSubsystem):
             #     self.mshadowEntityUINode.Init()
             # else:
             #     logger.info("实体头顶UI创建失败")
+
+    @EventListener(config.ResponseEntityShadowDataEvent, isCustomEvent=True)
+    def OnResponseEntityShadowData(self, args):
+        """接收服务器响应的实体数据"""
+        entity_id = args.entityId
+        shadow_data = args.shadow_data
+        clip_ratio = args.clip_ratio
+
+        if not entity_id:
+            return
+
+        entity_id_str = str(entity_id)
+
+        # 更新本地数据
+        updated_data = {
+            "clip_ratio": clip_ratio,
+            "shadow_data": shadow_data,
+            "is_full": args.is_full
+        }
+
+        self.setEntityShadowData(entity_id_str, updated_data)
 
     @EventListener(config.BindEntityUIEvent, isCustomEvent=True)
     def OnBindEntityUI(self, args):
@@ -477,7 +478,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id,  # 使用原始整数
+                    "bindEntityId": entity_id_str,  # 使用原始整数
                     "bindOffset": (0, 2.5, 0),  # UI在实体头顶的偏移量
                     "autoScale": 1  # 开启自动缩放
                 }
@@ -496,8 +497,8 @@ class ShadowClientSystem(ClientSubsystem):
                 # 使用实体的独立数据更新UI
                 entity_data = self.entity_shadow_data.get(entity_id_str)
                 if entity_data:
-                    print "调用实体 %s UI的UpdateShadow方法，ratio=%s" % (entity_id_str, entity_data["clip_ratio"])
-                    ui_node.UpdateShadow(entity_data["clip_ratio"])
+                    print "调用实体 %s UI的UpdateEntityShadow方法，ratio=%s" % (entity_id_str, entity_data["clip_ratio"])
+                    ui_node.UpdateEntityShadow(entity_data["clip_ratio"])
 
                 # 打印调试信息
                 print "已为实体 %s 创建UI节点，当前UI节点数量: %d" % (entity_id_str, len(self.entity_ui_nodes))
@@ -541,7 +542,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_int,  # 使用整数
+                    "bindEntityId": entity_id_str,  # 使用整数
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
@@ -559,10 +560,28 @@ class ShadowClientSystem(ClientSubsystem):
             import traceback
             traceback.print_exc()  # 打印完整的堆栈信息
 
+    def requestEntityShadowData(self, entity_id):
+        """向服务器请求指定实体的暗影能量数据"""
+        if not entity_id:
+            return
+
+        # 向服务器发送请求
+        self.sendServer(config.RequestEntityShadowDataEvent, {
+            "entityId": entity_id,
+            "playerId": clientApi.GetLocalPlayerId()
+        })
+
+        logger.info("向服务器请求实体 %s 的暗影能量数据" % entity_id)
+
     def getEntityShadowData(self, entity_id):
         """获取指定实体的暗影能量数据"""
         # 确保entity_id是字符串
         entity_id_str = str(entity_id)
+
+        print "[Debug] getEntityShadowData 调用. 实体ID: %s, 是否已有数据: %s" % (entity_id_str,
+                                                                                  entity_id_str in self.entity_shadow_data)
+        if entity_id_str in self.entity_shadow_data:
+            print "[Debug] 返回数据: %s" % self.entity_shadow_data[entity_id_str]
 
         if entity_id_str in self.entity_shadow_data:
             # 返回数据副本
@@ -579,9 +598,18 @@ class ShadowClientSystem(ClientSubsystem):
             return default_data.copy()
 
     def setEntityShadowData(self, entity_id, data):
-        """设置指定实体的暗影能量数据"""
         # 确保entity_id是字符串
         entity_id_str = str(entity_id)
+
+        print "[Debug] 设置实体数据. entity_id_str: %s, data: %s" % (entity_id_str, data)
+        print "[Debug] 当前所有实体数据键: %s" % (list(self.entity_shadow_data.keys()))
+
+        # 只打印前5个实体的数据，避免日志过长
+        for i, (key, value) in enumerate(list(self.entity_shadow_data.items())[:5]):
+            print "[Debug] 实体 %s 的数据: %s" % (key, value)
+
+        if len(self.entity_shadow_data) > 5:
+            print "[Debug] ... 还有 %d 个实体" % (len(self.entity_shadow_data) - 5)
 
         # 验证数据格式
         required_keys = ["clip_ratio", "shadow_data", "is_full"]
@@ -590,13 +618,18 @@ class ShadowClientSystem(ClientSubsystem):
                 logger.error("实体数据缺少必要字段: %s" % key)
                 return
 
+        # 【关键修复】在比较前对浮点数进行四舍五入
+        rounded_clip_ratio = round(data["clip_ratio"], 2)
+        data["clip_ratio"] = rounded_clip_ratio
+
         # 检查数据是否变化
         current_data = self.entity_shadow_data.get(entity_id_str)
         if (current_data and
-                current_data.get("clip_ratio") == data["clip_ratio"] and
-                current_data.get("shadow_data") == data["shadow_data"] and
-                current_data.get("is_full") == data["is_full"]):
+                current_data["clip_ratio"] == data["clip_ratio"] and
+                current_data["shadow_data"] == data["shadow_data"] and
+                current_data["is_full"] == data["is_full"]):
             # 数据无变化，跳过
+            print "[Debug] 实体 %s 数据无变化，跳过更新" % entity_id_str
             return
 
         # 存储数据
@@ -609,33 +642,10 @@ class ShadowClientSystem(ClientSubsystem):
                                                                            data["shadow_data"])
 
         # 更新UI
-        if entity_id_str in self.entity_ui_nodes:
-            ui_node = self.entity_ui_nodes[entity_id_str]
-            if ui_node and hasattr(ui_node, 'UpdateShadow'):
-                try:
-                    print "开始调用实体 %s 的UpdateShadow方法，ratio=%s" % (entity_id_str, data["clip_ratio"])
-                    # 调用UpdateShadow
-                    ui_node.UpdateShadow(data["clip_ratio"])
-                    print "实体 %s 的UpdateShadow方法调用完成" % entity_id_str
-                except Exception as e:
-                    logger.error("更新实体 %s UI失败: %s" % (entity_id_str, str(e)))
-                    print "更新实体 %s UI失败: %s" % (entity_id_str, str(e))
-                    # 如果UI节点失效，从映射中移除
-                    if entity_id_str in self.entity_ui_nodes:
-                        del self.entity_ui_nodes[entity_id_str]
-        else:
-            # +++ 关键修复：更详细的调试信息
-            logger.warning("实体 %s 没有对应的UI节点" % entity_id_str)
-            print "警告：实体 %s 没有对应的UI节点" % entity_id_str
-            print "当前UI节点列表: %s" % list(self.entity_ui_nodes.keys())
-            print "当前实体数据列表: %s" % list(self.entity_shadow_data.keys())
+        self.updateEntityUI(entity_id_str, data)
 
-            # 尝试自动创建UI节点
-            print "尝试为实体 %s 自动创建UI节点..." % entity_id_str
-            self.tryAutoCreateUI(entity_id_str, data)
-
-    def tryAutoCreateUI(self, entity_id_str, data):
-        """尝试自动创建UI节点"""
+    def tryAutoCreateUI(self, entity_id_str, data, retry_count=0):
+        """尝试自动创建UI节点，带重试机制"""
         try:
             # 检查实体ID是否有效
             try:
@@ -644,18 +654,19 @@ class ShadowClientSystem(ClientSubsystem):
                 print "实体ID %s 不是有效的整数" % entity_id_str
                 return
 
-            # +++ 关键修复：CheckCanBindUI期望整数
-            can_bind = clientApi.CheckCanBindUI(entity_id_str)
-            if not can_bind:
-                print "实体 %s 不存在或无法绑定UI" % entity_id_str
-                return
-
             # 检查UI节点是否已存在
             if entity_id_str in self.entity_ui_nodes:
                 print "实体 %s 已有UI节点" % entity_id_str
                 return
 
-            # +++ 关键修复：CreateUI的bindEntityId参数需要整数
+            # 检查是否超过最大重试次数
+            if retry_count > 3:
+                print "实体 %s 自动创建UI失败，已达到最大重试次数" % entity_id_str
+                return
+
+            print "第%s次尝试为实体 %s 自动创建UI..." % (retry_count + 1, entity_id_str)
+
+            # 创建新的UI节点
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
@@ -670,15 +681,64 @@ class ShadowClientSystem(ClientSubsystem):
                 ui_node.Init()
                 print "自动创建成功：为实体 %s 创建UI" % entity_id_str
 
-                # 更新UI显示
-                ui_node.UpdateShadow(data["clip_ratio"])
+                # 使用传入的数据更新UI
+                ui_node.UpdateEntityShadow(data["clip_ratio"])
             else:
                 print "自动创建失败：为实体 %s 创建UI失败" % entity_id_str
+                # 延迟1秒后重试
+                if retry_count < 3:
+                    time_comp = CCF.CreateGame(levelId)
+                    time_comp.AddTimer(1.0, lambda: self.tryAutoCreateUI(entity_id_str, data, retry_count + 1))
 
         except Exception as e:
             print "tryAutoCreateUI error: %s" % str(e)
             import traceback
-            traceback.print_exc()  # 打印完整的堆栈信息
+            traceback.print_exc()
+
+    @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
+    def OnAddShadowEnergy(self, args):
+        """增加暗影能量（服务端通知）"""
+        print "收到暗影能量增加事件"
+        print args.dict()
+
+        # 使用args.获取参数
+        amount = args.amount
+        entity_id = args.entityId
+
+        # 只处理玩家事件，不再处理实体事件
+        if entity_id is not None:
+            # 实体事件现在完全由UpdateEntityShadowEvent处理
+            print "忽略实体事件，由UpdateEntityShadowEvent处理"
+            return
+
+        # 只处理玩家事件
+        print "这是玩家的暗影能量事件，增加 %s 点" % amount
+
+        current_data = config_comp.GetConfigData("dn_shadow_energy")
+        if not current_data:
+            current_data = {"clip_ratio": 1.0, "shadow_data": 0, "is_full": False}
+
+        current_energy = current_data.get("shadow_data", 0)
+        new_energy = current_energy + amount
+
+        if new_energy > 100:
+            new_energy = 100
+
+        new_ratio = 1.0 - (new_energy / 100.0)
+
+        updated_player_data = {
+            "clip_ratio": new_ratio,
+            "shadow_data": new_energy,
+            "is_full": (new_energy >= 100)
+        }
+
+        config_comp.SetConfigData("dn_shadow_energy", updated_player_data)
+        print "玩家暗影能量：%s -> %s" % (current_energy, new_energy)
+
+        # 更新玩家UI
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        if ui_node:
+            ui_node.UpdateShadow(new_ratio)
 
     @EventListener(config.ClientItemTryUseEvent)
     def OnClientItemTryUse(self, args):
@@ -702,89 +762,51 @@ class ShadowClientSystem(ClientSubsystem):
         args.cancel = True
         self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
 
-    @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
-    def OnAddShadowEnergy(self, args):
-        """增加暗影能量（服务端通知）"""
-        print "收到暗影能量增加事件"
-        print args.dict()
-
-        # 使用args.获取参数
-        amount = args.amount
-
-        # 使用args.获取entityId
+    @EventListener(config.UpdateEntityShadowEvent, isCustomEvent=True)
+    def OnUpdateEntityShadow(self, args):
+        """接收服务器下发的实体暗影能量更新"""
         entity_id = args.entityId
+        shadow_data = args.shadow_data
+        clip_ratio = args.clip_ratio
+        is_full = args.is_full
 
-        # 判断是玩家事件还是实体事件
-        if entity_id is not None:
-            # 实体事件
-            print "这是实体 %s 的暗影能量事件，增加 %s 点" % (entity_id, amount)
+        if not entity_id:
+            return
 
-            # 确保entity_id是字符串形式
-            entity_id_str = str(entity_id)
+        entity_id_str = str(entity_id)
 
-            # 获取当前实体的暗影能量数据
-            current_data = self.getEntityShadowData(entity_id_str)
-            if not current_data:
-                # 如果实体没有数据，初始化
-                current_data = {
-                    "clip_ratio": 1.0,
-                    "shadow_data": 0,
-                    "is_full": False
-                }
-                self.entity_shadow_data[entity_id_str] = current_data.copy()
+        # 直接使用服务器下发的数据
+        updated_data = {
+            "clip_ratio": clip_ratio,
+            "shadow_data": shadow_data,
+            "is_full": is_full
+        }
 
-            current_energy = current_data.get("shadow_data", 0)
-            new_energy = current_energy + amount
+        # 更新本地数据存储
+        self.entity_shadow_data[entity_id_str] = updated_data.copy()
 
-            if new_energy > 100:
-                new_energy = 100
+        # 更新UI
+        self.updateEntityUI(entity_id_str, updated_data)
 
-            new_ratio = 1.0 - (new_energy / 100.0)
+    def updateEntityUI(self, entity_id_str, data):
+        """统一的实体UI更新方法，确保只更新指定实体"""
+        print "[Debug] updateEntityUI: 只更新实体 %s 的UI" % entity_id_str
 
-            # 创建新的数据对象
-            updated_data = {
-                "clip_ratio": new_ratio,
-                "shadow_data": new_energy,
-                "is_full": (new_energy >= 100)
-            }
-
-            # 更新实体独立数据
-            self.setEntityShadowData(entity_id_str, updated_data)
-
-            print "实体 %s 暗影能量：%s -> %s" % (entity_id, current_energy, new_energy)
-
+        if entity_id_str in self.entity_ui_nodes:
+            ui_node = self.entity_ui_nodes[entity_id_str]
+            if ui_node and hasattr(ui_node, 'UpdateEntityShadow'):
+                try:
+                    print "[Debug] 更新实体 %s 的UI，ratio=%s" % (entity_id_str, data["clip_ratio"])
+                    ui_node.UpdateEntityShadow(data["clip_ratio"])
+                    ui_node.UpdateScreen()
+                except Exception as e:
+                    logger.error("更新实体 %s UI失败: %s" % (entity_id_str, str(e)))
+                    if entity_id_str in self.entity_ui_nodes:
+                        del self.entity_ui_nodes[entity_id_str]
         else:
-            # 玩家事件
-            print "这是玩家的暗影能量事件，增加 %s 点" % amount
-
-            current_data = config_comp.GetConfigData("dn_shadow_energy")
-            if not current_data:
-                current_data = {"clip_ratio": 1.0, "shadow_data": 0, "is_full": False}
-
-            current_energy = current_data.get("shadow_data", 0)
-            new_energy = current_energy + amount
-
-            if new_energy > 100:
-                new_energy = 100
-
-            new_ratio = 1.0 - (new_energy / 100.0)
-
-            # 创建新的玩家数据对象
-            updated_player_data = {
-                "clip_ratio": new_ratio,
-                "shadow_data": new_energy,
-                "is_full": (new_energy >= 100)
-            }
-
-            # 更新玩家全局数据
-            config_comp.SetConfigData("dn_shadow_energy", updated_player_data)
-
-            print "玩家暗影能量：%s -> %s" % (current_energy, new_energy)
-
-            # 更新玩家UI
-            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-            if ui_node:
-                ui_node.UpdateShadow(new_ratio)
+            # UI不存在，尝试创建
+            print "[Debug] 实体 %s 没有UI节点，尝试自动创建" % entity_id_str
+            self.tryAutoCreateUI(entity_id_str, data)
 
     @EventListener(config.DamageEvent, isCustomEvent=True)
     def OnDamageEvent(self, args):
