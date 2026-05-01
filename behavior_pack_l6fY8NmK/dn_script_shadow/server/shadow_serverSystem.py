@@ -16,6 +16,56 @@ levelId = serverApi.GetLevelId()
 class ShadowServerSystem(ServerSubsystem):
     def onInit(self):
         print "===== Shadow Server System Init (Dynamic) ====="
+        # 新增：服务器维护所有实体的暗影能量状态
+        self.entity_shadow_states = {}  # entity_id -> {"shadow_data": int, "clip_ratio": float}
+
+    def getEntityShadowState(self, entity_id):
+        """获取实体暗影能量状态"""
+        return self.entity_shadow_states.get(str(entity_id), {"shadow_data": 0, "clip_ratio": 1.0})
+
+    def setEntityShadowState(self, entity_id, data):
+        """设置实体暗影能量状态并广播"""
+        entity_id_str = str(entity_id)
+        self.entity_shadow_states[entity_id_str] = data.copy()
+
+        # 广播给所有玩家
+        self.broadcastEntityShadowUpdate(entity_id_str, data)
+
+    def broadcastEntityShadowUpdate(self, entity_id, data):
+        """向所有玩家广播实体暗影能量更新"""
+        player_list = serverApi.GetPlayerList()
+        for player_id in player_list:
+            self.sendClient(player_id, config.UpdateEntityShadowEvent, {
+                "entityId": entity_id,
+                "shadow_data": data["shadow_data"],
+                "clip_ratio": data["clip_ratio"],
+                "is_full": data.get("is_full", False)
+            })
+
+    def SendShadowEnergyToEntity(self, entity_id, amount):
+        """为指定实体增加暗影能量（服务器权威版本）"""
+        try:
+            # 获取当前状态
+            current_state = self.getEntityShadowState(entity_id)
+            current_energy = current_state.get("shadow_data", 0)
+
+            # 计算新状态
+            new_energy = min(100, current_energy + amount)
+            new_ratio = 1.0 - (new_energy / 100.0)
+
+            new_state = {
+                "shadow_data": new_energy,
+                "clip_ratio": new_ratio,
+                "is_full": (new_energy >= 100)
+            }
+
+            # 更新并广播
+            self.setEntityShadowState(entity_id, new_state)
+
+            logger.info("实体 %s 暗影能量: %s -> %s" % (entity_id, current_energy, new_energy))
+
+        except Exception as e:
+            logger.error("SendShadowEnergyToEntity error: %s" % str(e))
 
     def GetSkillConfig(self, skill_id):
         """获取技能配置"""
@@ -23,13 +73,6 @@ class ShadowServerSystem(ServerSubsystem):
             if skill["skill_id"] == skill_id:
                 return skill
         return None
-
-    def DelayDamage(self):
-        """shadow_blast技能延迟施加伤害"""
-        cmd_comp = serverApi.GetEngineCompFactory().CreateCommand(levelId)
-        player_id = serverApi.GetHostPlayerId()
-        delay_command = "/function shadow_skills"
-        cmd_comp.SetCommand(delay_command, player_id)
 
     @EventListener(config.ClientUseShadowEnergyEvent, isCustomEvent=True)
     def OnClientUseShadowEnergy(self, args):
@@ -345,25 +388,39 @@ class ShadowServerSystem(ServerSubsystem):
     @EventListener("ServerSpawnMobEvent")
     def OnServerSpawnMob(self, args):
         """服务端生成生物事件"""
-        print "服务端生成生物事件"
-        print args.dict()
-
         try:
-            # 获取生成的生物信息
             entity_id = args.entityId
             identifier = args.identifier
 
-            print "生成的生物ID: %s, 类型: %s" % (entity_id, identifier)
-
-            # 检查是否为需要绑定UI的生物类型
-            # 这里可以根据需要修改条件
             if identifier.find("minecraft") != -1:
-                print "为生物 %s (%s) 发送UI绑定通知" % (entity_id, identifier)
-                self.NotifyClientToBindUI(entity_id)
+                # 确保初始化实体暗影能量状态为0
+                initial_state = {
+                    "shadow_data": 0,  # 强制为0
+                    "clip_ratio": 1.0,
+                    "is_full": False
+                }
+
+                entity_id_str = str(entity_id)
+
+                # 先检查是否已存在，避免重复初始化
+                if entity_id_str not in self.entity_shadow_states:
+                    self.entity_shadow_states[entity_id_str] = initial_state.copy()
+
+                    # 立即广播初始状态给所有玩家
+                    self.broadcastEntityShadowUpdate(entity_id_str, initial_state)
+
+                    logger.info("新实体 %s 初始化，暗影能量: 0" % entity_id_str)
+
+                    # 延迟发送UI绑定通知
+                    self.NotifyClientToBindUI(entity_id)
+                else:
+                    logger.warning("实体 %s 已存在，跳过重复初始化" % entity_id_str)
 
         except Exception as e:
             logger.error("OnServerSpawnMob error: %s" % str(e))
-            print "OnServerSpawnMob error: %s" % str(e)
+
+        except Exception as e:
+            logger.error("OnServerSpawnMob error: %s" % str(e))
 
     def NotifyClientToBindUI(self, entity_id):
         """
@@ -417,15 +474,13 @@ class ShadowServerSystem(ServerSubsystem):
 
     @EventListener("DamageEvent")
     def OnEntityHurtEvent(self, args):
-        """
-        实体受伤事件 - 实体被玩家攻击
-        """
+        """实体受伤事件 - 实体被玩家攻击"""
         try:
-            # 从事件参数中获取数据
             hurt_entity_id = args.entityId
-            attacker_id = args.srcId  # DamageEvent中攻击者参数是srcId
+            attacker_id = args.srcId
 
             if not hurt_entity_id or not attacker_id:
+                logger.warning("OnEntityHurtEvent: 无效的事件参数")
                 return
 
             # 检查攻击者是否是玩家
@@ -433,12 +488,16 @@ class ShadowServerSystem(ServerSubsystem):
             if attacker_id in player_list:
                 # 检查受伤实体是否是玩家（避免玩家攻击玩家也触发）
                 if hurt_entity_id not in player_list:
-                    # 实体被玩家攻击，为该实体增加10点暗影能量
-                    logger.info("实体 %s 被玩家 %s 攻击，增加暗影能量" % (hurt_entity_id, attacker_id))
+                    logger.info("玩家 %s 攻击实体 %s，准备增加暗影能量" % (attacker_id, hurt_entity_id))
+                    # 调用SendShadowEnergyToEntity方法
                     self.SendShadowEnergyToEntity(hurt_entity_id, 10)
+                else:
+                    logger.info("玩家攻击玩家，不增加暗影能量")
+            else:
+                logger.info("攻击者不是玩家，是实体 %s" % attacker_id)
 
         except Exception as e:
-            logger.error("DamageEvent error: %s" % str(e))
+            logger.error("OnEntityHurtEvent error: %s" % str(e))
 
     @EventListener("PlayerHurtEvent")
     def OnPlayerHurtEvent(self, args):
@@ -463,23 +522,22 @@ class ShadowServerSystem(ServerSubsystem):
         except Exception as e:
             logger.error("PlayerHurtEvent error: %s" % str(e))
 
-    def SendShadowEnergyToEntity(self, entity_id, amount):
-        """
-        为指定实体发送暗影能量增加事件
-        注意：需要将事件发送给所有玩家，因为任何玩家都可能看到这个实体的UI
-        """
-        try:
-            # 获取所有在线玩家
-            player_list = serverApi.GetPlayerList()
+    @EventListener(config.RequestEntityShadowDataEvent, isCustomEvent=True)
+    def OnRequestEntityShadowData(self, args):
+        """处理客户端请求实体数据"""
+        entity_id = args.entityId
+        player_id = args.playerId
 
-            for player_id in player_list:
-                # 向每个玩家发送事件，让他们的客户端更新该实体的暗影能量
-                self.sendClient(player_id, config.AddShadowEnergyEvent, {
-                    "amount": amount,
-                    "entityId": entity_id
-                })
+        if not entity_id or not player_id:
+            return
 
-            logger.info("为实体 %s 发送 %s 点暗影能量给所有玩家" % (entity_id, amount))
+        # 获取实体数据
+        entity_data = self.getEntityShadowState(entity_id)
 
-        except Exception as e:
-            logger.error("SendShadowEnergyToEntity error: %s" % str(e))
+        # 发送给请求的客户端
+        self.sendClient(player_id, config.ResponseEntityShadowDataEvent, {
+            "entityId": entity_id,
+            "shadow_data": entity_data.get("shadow_data", 0),
+            "clip_ratio": entity_data.get("clip_ratio", 1.0),
+            "is_full": entity_data.get("is_full", False)
+        })
