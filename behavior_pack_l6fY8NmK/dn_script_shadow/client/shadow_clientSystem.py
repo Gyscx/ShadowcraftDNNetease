@@ -659,7 +659,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_int,  # 使用整数
+                    "bindEntityId": str(entity_id_int),  # 使用整数
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
