@@ -445,14 +445,19 @@ class ShadowClientSystem(ClientSubsystem):
             logger.info("开始为实体 %s 创建头顶UI" % entity_id)
             print "开始为实体 %s 创建头顶UI" % entity_id
 
-            # +++ 关键修复：确保entity_id是字符串
-            entity_id_str = str(entity_id)
+            # +++ 关键修复：确保entity_id使用整数进行绑定检查和UI创建
+            try:
+                entity_id_int = int(entity_id)
+            except Exception:
+                logger.error("实体ID %s 无效，无法绑定UI" % entity_id)
+                return
 
-            # +++ 关键修复：CheckCanBindUI期望整数
-            can_bind = clientApi.CheckCanBindUI(entity_id_str)
+            entity_id_str = str(entity_id_int)
+
+            can_bind = clientApi.CheckCanBindUI(entity_id_int)
             if not can_bind:
-                logger.warning("实体 %s 暂时无法绑定UI，等待后重试" % entity_id)
-                print "实体 %s 暂时无法绑定UI，等待后重试" % entity_id
+                logger.warning("实体 %s 暂时无法绑定UI，等待后重试" % entity_id_int)
+                print "实体 %s 暂时无法绑定UI，等待后重试" % entity_id_int
                 # 延迟1秒后重试
                 time_comp = CCF.CreateGame(levelId)
                 time_comp.AddTimer(1.0, lambda: self.retryBindUI(entity_id_str))
@@ -478,9 +483,9 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_str,  # 使用原始整数
-                    "bindOffset": (0, 2.5, 0),  # UI在实体头顶的偏移量
-                    "autoScale": 1  # 开启自动缩放
+                    "bindEntityId": entity_id_int,
+                    "bindOffset": (0, 2.5, 0),
+                    "autoScale": 1
                 }
             )
 
@@ -528,7 +533,7 @@ class ShadowClientSystem(ClientSubsystem):
                 return
 
             # +++ 关键修复：CheckCanBindUI期望整数
-            can_bind = clientApi.CheckCanBindUI(entity_id_str)
+            can_bind = clientApi.CheckCanBindUI(entity_id_int)
             if not can_bind:
                 print "实体 %s 仍然无法绑定UI，放弃重试" % entity_id_str
                 return
@@ -542,7 +547,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_str,  # 使用整数
+                    "bindEntityId": entity_id_int,
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
@@ -670,7 +675,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": str(entity_id_int),  # 使用整数
+                    "bindEntityId": entity_id_int,
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }

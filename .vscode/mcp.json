@@ -1,12 +1,10 @@
 {
 	"servers": {
-		"ModSDK MCP Server": {
+		"modsdk-mcp-server": {
 			"command": "python",
 			"args": [
-				"-m",
-				"modsdk_mcp"
-			],
-			"cwd": "D:/program/modsdk_mcp_server"
+				"D:/program/modsdk_mcp_server/start_mcp.py"
+			]
 		}
 	}
 }
