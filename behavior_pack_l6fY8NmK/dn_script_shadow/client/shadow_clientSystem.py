@@ -4,7 +4,7 @@ from .. import config
 from mod_log import logger
 
 from ..architect.compact import ClientSubsystem, SubsystemClient
-from ..architect.compact import EventListener, ChainedEvent
+from ..architect.compact import EventListener, CustomEvent
 
 CS = clientApi.GetClientSystemCls()
 CCF = clientApi.GetEngineCompFactory()
@@ -345,7 +345,7 @@ class ShadowClientSystem(ClientSubsystem):
                     ui_node.StartCooldown(skill_cfg["skill_id"])
                 break
 
-    @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
+    @CustomEvent(config.ClientUpgradeSkillEvent)
     def OnClientUpgradeSkill(self, args):
         """客户端请求升级技能"""
         skill_id = args.skill_id
@@ -406,7 +406,7 @@ class ShadowClientSystem(ClientSubsystem):
             # else:
             #     logger.info("实体头顶UI创建失败")
 
-    @EventListener(config.ResponseEntityShadowDataEvent, isCustomEvent=True)
+    @CustomEvent(config.ResponseEntityShadowDataEvent)
     def OnResponseEntityShadowData(self, args):
         """接收服务器响应的实体数据"""
         entity_id = args.entityId
@@ -427,7 +427,7 @@ class ShadowClientSystem(ClientSubsystem):
 
         self.setEntityShadowData(entity_id_str, updated_data)
 
-    @EventListener(config.BindEntityUIEvent, isCustomEvent=True)
+    @CustomEvent(config.BindEntityUIEvent)
     def OnBindEntityUI(self, args):
         print "收到绑定实体UI事件"
         print args.dict()
@@ -700,7 +700,7 @@ class ShadowClientSystem(ClientSubsystem):
             import traceback
             traceback.print_exc()
 
-    @EventListener(config.AddShadowEnergyEvent, isCustomEvent=True)
+    @CustomEvent(config.AddShadowEnergyEvent)
     def OnAddShadowEnergy(self, args):
         """增加暗影能量（服务端通知）"""
         print "收到暗影能量增加事件"
@@ -767,7 +767,7 @@ class ShadowClientSystem(ClientSubsystem):
         args.cancel = True
         self.sendServer(config.ClientUseShadowEnergyEvent, {"playerId": playerId})
 
-    @EventListener(config.UpdateEntityShadowEvent, isCustomEvent=True)
+    @CustomEvent(config.UpdateEntityShadowEvent)
     def OnUpdateEntityShadow(self, args):
         """接收服务器下发的实体暗影能量更新"""
         entity_id = args.entityId
@@ -813,7 +813,7 @@ class ShadowClientSystem(ClientSubsystem):
             print "[Debug] 实体 %s 没有UI节点，尝试自动创建" % entity_id_str
             self.tryAutoCreateUI(entity_id_str, data)
 
-    @EventListener(config.DamageEvent, isCustomEvent=True)
+    @CustomEvent(config.DamageEvent)
     def OnDamageEvent(self, args):
         """客户端玩家受伤事件"""
         entityId = args.entityId
@@ -865,7 +865,7 @@ class ShadowClientSystem(ClientSubsystem):
             if ui_node:
                 ui_node.UpdateShadow(new_ratio)
 
-    @EventListener(config.UpgradeSkillResultEvent, isCustomEvent=True)
+    @CustomEvent(config.UpgradeSkillResultEvent)
     def OnUpgradeSkillResult(self, args):
         """处理服务端返回的升级结果"""
         skill_id = args.skill_id
@@ -910,7 +910,7 @@ class ShadowClientSystem(ClientSubsystem):
             reason = args.reason
             notify_comp.SetLeftCornerNotify("升级失败: %s" % reason)
 
-    @EventListener(config.SyncSkillLevelsEvent, isCustomEvent=True)
+    @CustomEvent(config.SyncSkillLevelsEvent)
     def OnSyncSkillLevels(self, args):
         """接收服务端同步的技能等级"""
         skill_levels = args.skill_levels

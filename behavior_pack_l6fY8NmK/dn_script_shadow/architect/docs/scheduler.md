@@ -1,85 +1,164 @@
-# 调度系统 (Scheduler)
+# 调度器 Scheduler
 
-调度系统提供了灵活的任务执行机制，支持 tick、渲染帧以及固定频率的任务调度。
+`architect` 的调度器提供了灵活的任务调度机制，支持普通任务、可暂停任务（协程）和调度序列。
 
-## @Sched 装饰器
+## 核心类
 
-在子系统内部，可以使用 `@Sched` 装饰器定义定时任务。
+### Scheduler
 
-### @Sched.Tick()
-每一 tick 执行一次。
+调度器管理多个任务队列，每个队列对应一个调度阶段（flag）。任务按阶段依次执行。
+
 ```python
-@Sched.Tick()
-def onTick(self):
-    # 逻辑代码
-    pass
+from architect.core.scheduler import Scheduler
+
+scheduler = Scheduler()
+
+# 默认执行顺序
+print(scheduler.scheduleSequence)
+# ('BeforeUpdate', 'Update', 'AfterUpdate')
 ```
 
-### @Sched.Render()
-每一渲染帧执行一次（仅限客户端子系统）。
+### SchedulerPoller
+
+可轮询的调度器封装，`SimpleFixedScheduler` 是其子类，提供固定频率执行：
+
 ```python
-@Sched.Render()
-def onRender(self):
-    # 适合处理 UI 平滑过渡或特效
-    pass
+from architect.core.scheduler import SimpleFixedScheduler
+
+poller = SimpleFixedScheduler(period=1)
+
+# 启动轮询
+poller.start(lambda: print("tick"))
+
+# 更新（在 Tick 中调用）
+poller.update()
+
+# 停止
+poller.stop()
 ```
 
-### @Sched.Fixed(name)
-按固定频率执行。需要先通过 `scheduleFixed` 启动调度器。
-```python
-@SubsystemServer
-class MyService(ServerSubsystem):
-    def onReady(self):
-        # 启动一个名为 'sec1' 的调度器，周期为 1.0 秒
-        self.scheduleFixed('sec1', 1.0)
+## 添加任务
 
-    @Sched.Fixed('sec1')
-    def onTimer(self):
-        print("执行定时任务")
+### 普通任务
+
+```python
+def my_task(*args):
+    print("Task executed with:", args)
+
+scheduler.addTask('Update', my_task)
 ```
 
-### @Sched.Event(eventType, isCustom=False)
-当特定事件触发时，作为调度任务执行。
+### 可暂停任务（协程）
 
-## 任务顺序 (Flags)
-调度任务可以指定在 tick 的不同阶段执行：
-- `BeforeUpdate`: 在标准 update 之前。
-- `Update`: (默认) 标准 update 阶段。
-- `AfterUpdate`: 在标准 update 之后。
+使用生成器函数，`yield` 时暂停，下次调用从暂停处继续：
 
 ```python
-from ..architect.conf import SchedUpdateFlags
-
-@Sched.Tick(SchedUpdateFlags.AfterUpdate)
-def lateUpdate(self):
-    pass
-```
-
-## 编程式任务 (Scheduler API)
-
-除了装饰器，你也可以通过子系统获取调度器实例来手动管理任务：
-
-- `run(fn)`: 立即在下一帧/tick 执行。
-- `runTimeout(fn, ticks)`: 延迟指定 tick 数后执行一次。
-- `runInterval(fn, ticks)`: 每隔指定 tick 数循环执行。
-- `clearTimeout(taskId)`: 取消已排期的任务。
-
-```python
-def onInit(self):
-    # 在客户端 tick 调度器中运行一个定时任务
-    from ..subsystem import SubsystemManager
-    SubsystemManager.clientTickSched.runInterval(self.my_task, 20)
-```
-
-## 协程支持 (SuspendableTask)
-调度器内部支持生成器形式的协程任务，通过 `addSuspendableTask` 手动添加。
-```python
-def my_coroutine(self):
+def my_coroutine():
     print("Step 1")
     yield
     print("Step 2")
+    yield
+    print("Step 3")
 
-# 在 Scheduler 实例中添加
-# manager.clientTickSched.addSuspendableTask(SchedUpdateFlags.Update, self.my_coroutine)
+scheduler.addSuspendableTask('Update', my_coroutine)
 ```
-> 注意：通常建议优先使用标准的装饰器。
+
+## 执行任务
+
+```python
+# 执行单个阶段的队列
+scheduler.execute('Update', args=[1, 2, 3])
+
+# 执行完整序列（按 scheduleSequence 顺序）
+dt, skipped = scheduler.executeSequence()
+```
+
+### 执行序列返回值
+
+- **deltaTime**: 距上次执行的时间差（秒）
+- **skippedUpdates**: 跳过的更新次数（当 deltaTime 超过阈值时）
+
+## 移除任务
+
+```python
+# 移除指定任务
+scheduler.removeTask('Update', taskId=123)
+
+# 移除某个阶段的所有任务（taskId=-1）
+scheduler.removeTask('Update')
+
+# 在任务执行中标记移除（延迟删除，避免迭代器异常）
+from architect.core.scheduler import Scheduler
+scheduler.removeTask('Update', taskId)
+
+# 或调用 removeTaskByFn
+scheduler.removeTaskByFn(my_function, 'Update')
+```
+
+## 内部辅助类
+
+### Task
+
+封装一个可调用对象：
+
+```python
+from architect.core.scheduler import Task
+
+task = Task(lambda: print("task"))
+print(task.id)  # 自动递增的 ID
+print(task.finished)  # False
+```
+
+### SuspendableTask
+
+封装一个生成器，每次 `callOnce()` 执行到下一个 `yield`：
+
+```python
+task = SuspendableTask(lambda: (print("a") for _ in range(1)))
+task.callOnce()  # 执行到 yield 或结束
+print(task.finished)  # 如果生成器耗尽则为 True
+```
+
+## 与 Subsystem 集成
+
+在 `ServerSubsystem` / `ClientSubsystem` 中通过 `system` 访问调度器：
+
+```python
+class MySystem(ServerSubsystem):
+    def onReady(self):
+        self.system.addSchedulerTask(self.update)
+
+    def update(self):
+        print("Tick update")
+```
+
+框架提供的 `scheduleFixed` / `stopFixed` 简化了固定频率调度器的使用：
+
+```python
+class MySystem(ServerSubsystem):
+    def onReady(self):
+        self.scheduleFixed('myTask', period=1.0)
+
+    def stop(self):
+        self.stopFixed('myTask')
+```
+
+## 调度标记常量
+
+调度阶段标记在 `architect.conf` 中定义：
+
+```python
+from architect.conf import (
+    TIMER_TASK,          # 定时器任务
+    SYSTEM_SCHED_ANNO,   # 系统调度注解
+    SchedEventFlags,     # 事件调度标记
+    SchedUpdateFlags,    # 更新调度标记
+)
+
+# SchedUpdateFlags
+SchedUpdateFlags.BeforeUpdate  # 更新前
+SchedUpdateFlags.Update         # 更新中
+SchedUpdateFlags.AfterUpdate    # 更新后
+
+# SchedEventFlags
+SchedEventFlags.OnEvent         # 事件触发时

@@ -65,6 +65,8 @@ class ChainedEvent(object):
         self.eventType = eventType
         self._interruptRef = interruptRef
         self._data = data
+        if 'from' in data:
+            data['source'] = data['from']
 
     def stop(self):
         """停止事件传递"""
@@ -98,7 +100,7 @@ class EventChain(Unreliable):
     def __init__(self, evType):
         Unreliable.__init__(self)
         self.evType = evType
-        self.__handlers = []
+        self._handlers = []
         """顺序触发监听器，通过 stop() 决定是否结束事件传递"""
         self.guarded = True
         """当为 True 时, 上一个事件监听器出错后，后续事件监听器将不会执行"""
@@ -107,19 +109,19 @@ class EventChain(Unreliable):
 
     def capture(self, fn):
         """添加事件监听器（捕获）"""
-        self.__handlers.append(fn)
+        self._handlers.append(fn)
 
     def addListener(self, fn):
         """添加事件监听器（冒泡）"""
-        self.__handlers.insert(0, fn)
+        self._handlers.insert(0, fn)
 
     def removeListener(self, fn):
-        self.__handlers.remove(fn)
+        self._handlers.remove(fn)
 
     def dispatch(self, _ev):
         shouldBreak = Ref(False)
         ev = ChainedEvent(self.evType, _ev, shouldBreak)
-        handlers = self.__handlers if self.useCapture else reversed(self.__handlers)
+        handlers = self._handlers if self.useCapture else reversed(self._handlers)
         for fn in handlers:
             _, err = self.tryCall(fn, ev)
             if err and self.guarded:
@@ -129,10 +131,16 @@ class EventChain(Unreliable):
                 return
 
 
-def EventListener(eventType, isCustomEvent=False):
+def EventListener(eventType=None, isCustomEvent=False):
     def decorator(fn):
         # 标记方法为事件监听器
-        AnnotationHelper.addAnnotation(fn, EVENT_LISTENER, eventType)
+        _evType = eventType
+        if eventType is None:
+            defaults = fn.func_defaults
+            if not defaults or defaults[0] is None:
+                raise ValueError('Event type is required')
+            _evType = defaults[0].__class__.__name__
+        AnnotationHelper.addAnnotation(fn, EVENT_LISTENER, _evType)
         if isCustomEvent:
             AnnotationHelper.addAnnotation(fn, CUSTOM_EVENT, True)
         return fn
@@ -142,7 +150,13 @@ def EventListener(eventType, isCustomEvent=False):
 def CustomEvent(eventType):
     def decorator(fn):
         # 标记方法为自定义事件监听器
-        AnnotationHelper.addAnnotation(fn, EVENT_LISTENER, eventType)
+        _evType = eventType
+        if eventType is None:
+            defaults = fn.func_defaults
+            if not defaults or defaults[0] is None:
+                raise ValueError('Event type is required')
+            _evType = defaults[0].__class__.__name__
+        AnnotationHelper.addAnnotation(fn, EVENT_LISTENER, _evType)
         AnnotationHelper.addAnnotation(fn, CUSTOM_EVENT, True)
         return fn
     return decorator

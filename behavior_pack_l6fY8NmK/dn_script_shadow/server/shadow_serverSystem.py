@@ -5,7 +5,7 @@ from mod_log import logger
 from .. import config
 
 from ..architect.compact import ServerSubsystem, SubsystemServer
-from ..architect.compact import EventListener
+from ..architect.compact import EventListener, CustomEvent
 
 SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
@@ -74,7 +74,7 @@ class ShadowServerSystem(ServerSubsystem):
                 return skill
         return None
 
-    @EventListener(config.ClientUseShadowEnergyEvent, isCustomEvent=True)
+    @CustomEvent(config.ClientUseShadowEnergyEvent)
     def OnClientUseShadowEnergy(self, args):
         """服务端玩家右键暗影能量物品事件"""
         print "222"
@@ -246,7 +246,7 @@ class ShadowServerSystem(ServerSubsystem):
         print args.dict()
         print playerId
 
-    @EventListener(config.ClientUpgradeSkillEvent, isCustomEvent=True)
+    @CustomEvent(config.ClientUpgradeSkillEvent)
     def OnClientUpgradeSkill(self, args):
         """服务端处理客户端升级请求（转发到统一处理方法）"""
         skill_id = args.skill_id
@@ -273,7 +273,7 @@ class ShadowServerSystem(ServerSubsystem):
         # 调用统一的升级处理方法
         self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
 
-    @EventListener(config.ServerUpgradeSkillEvent, isCustomEvent=True)
+    @CustomEvent(config.ServerUpgradeSkillEvent)
     def OnServerUpgradeSkill(self, args):
         """服务端处理技能升级请求"""
         skill_id = args.skill_id
@@ -291,7 +291,7 @@ class ShadowServerSystem(ServerSubsystem):
         # 调用统一的升级处理方法
         self.ProcessSkillUpgrade(player_id, skill_id, fragment_cost, current_level)
 
-    @EventListener(config.RequestSkillLevelsEvent, isCustomEvent=True)
+    @CustomEvent(config.RequestSkillLevelsEvent)
     def OnRequestSkillLevels(self, args):
         """处理客户端请求技能等级同步"""
         player_id = args.playerId
@@ -320,7 +320,7 @@ class ShadowServerSystem(ServerSubsystem):
             time_comp = SCF.CreateGame(levelId)
             time_comp.AddTimer(1.0, lambda: self.SyncSkillLevelsToPlayer(player_id))
 
-    @EventListener(config.ServerSkillEvent, isCustomEvent=True)
+    @CustomEvent(config.ServerSkillEvent)
     def OnSkillEvent(self, args):
         """服务端释放技能事件（使用命令）"""
         skill_id = args.skill
@@ -522,7 +522,7 @@ class ShadowServerSystem(ServerSubsystem):
         except Exception as e:
             logger.error("PlayerHurtEvent error: %s" % str(e))
 
-    @EventListener(config.RequestEntityShadowDataEvent, isCustomEvent=True)
+    @CustomEvent(config.RequestEntityShadowDataEvent)
     def OnRequestEntityShadowData(self, args):
         """处理客户端请求实体数据"""
         entity_id = args.entityId

@@ -46,16 +46,25 @@ class AnimationEventDispatcher(Unreliable):
             return self._callNamedMethod(methodName, entityId, animComp)
 
     def onEnded(self, entityId, animComp):
+        """
+        动画被打断或者正常结束时都会调用
+        """
         pass
 
     def onInterrupted(self, entityId, animComp):
+        """
+        动画被打断时调用
+        """
         pass
 
     def onFinish(self, entityId, animComp):
+        """
+        动画正常结束时调用
+        """
         pass
 
 
-def AnimExListener(animName):
+def Dispatch(animName):
     def wrapper(cls):
         cls.getOrCreate(animName)
         return cls
@@ -77,7 +86,7 @@ class BaseActionDispatcher(AnimationEventDispatcher):
         op.SetCanJump(canMove)
 
     def cam(self, entityId, lock=False):
-        op = getOneComponent(entityId, NeC.Operation) # type: CameraComponentClient
+        op = getOneComponent(entityId, NeC.Operation)
         op.SetCanDrag(not lock)
 
     def notifyStunStart(self, entityId, animEx):

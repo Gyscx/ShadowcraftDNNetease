@@ -1,9 +1,9 @@
 from ...core.loader import Plugin, PluginBase
-from ...core.subsystem import SubsystemManager
 from ...component import createSingletonComponent
-from ...core.basic import localPlayerId
+from ...event import CustomEvent
 
 from .components.inputEx import InputExComponent
+from .enum import IA_EVENT_PREFIX, InputState
 
 
 @Plugin(
@@ -13,13 +13,16 @@ from .components.inputEx import InputExComponent
     'Extended input plugin'
 )
 class InputExPlugin(PluginBase):
-    def onAttach(self, manager):
-        # type: (SubsystemManager) -> None
-        manager.addListener(
-            'AddPlayerCreatedClientEvent',
-            self._bindInputEx
-        )
+    def onCreate(self):
+        from .components.inputEx import InputExComponent
+        from .systems import inputExClient
 
-    def _bindInputEx(self, ev):
-        if localPlayerId() == ev.playerId:
-            createSingletonComponent(InputExComponent)
+    def onReady(self, manager):
+        self._bindInputEx()
+
+    def _bindInputEx(self):
+        createSingletonComponent(InputExComponent)
+
+
+def InputAction(actionName, inputState=InputState.Triggered):
+    return CustomEvent(IA_EVENT_PREFIX + actionName + str(inputState))

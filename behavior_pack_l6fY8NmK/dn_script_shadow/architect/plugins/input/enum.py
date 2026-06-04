@@ -114,40 +114,92 @@ class MouseKey:
 
 
 class GamepadKey:     # Xbox layout
-    A = 1                        # A键
-    B = 2                        # B键
-    X = 3                        # X键
-    Y = 4                        # Y键
-    Up = 5                    # 向上方向键
-    Down = 6                # 向下方向键
-    Left = 7                # 向左方向键
-    Right = 8                # 向右方向键
-    LS = 9                        # LS键
-    RS = 10                        # RS键
-    LB = 11                        # LB键
-    RB = 12                        # RB键
-    View = 13                    # VIEW键
-    Menu = 14                    # MENU键
-    
+    A = 1                       # A键
+    B = 2                       # B键
+    X = 3                       # X键
+    Y = 4                       # Y键
+    Up = 5                      # 向上方向键
+    Down = 6                    # 向下方向键
+    Left = 7                    # 向左方向键
+    Right = 8                   # 向右方向键
+    LS = 9                      # LS键
+    RS = 10                     # RS键
+    LB = 11                     # LB键
+    RB = 12                     # RB键
+    View = 13                   # VIEW键
+    Menu = 14                   # MENU键
+
 
 class GamepadAxis:
-    LSX = 0                     # 左摇杆X轴
-    LSY = 1                     # 左摇杆Y轴
-    RSX = 2                     # 右摇杆X轴
-    RSY = 3                     # 右摇杆Y轴
-    LT = 4                      # 左触发器
-    RT = 5                      # 右触发器
-    
+    LS = 4096                      # 左摇杆
+    RS = 4097                      # 右摇杆
+    LT = 256                       # 左触发器
+    RT = 257                       # 右触发器
+
+
+class MouseAxis:
+    Pos = 1
+    Scroll = 2
+    Move = 3
+
+
+class InputType:
+    Key = 1
+    Touch = 2
+    Gamepad = 3
+    Axis = 4
+
+
+class TouchType:
+    Tap = 1
+    Hold = 2
+
+
+class TouchAxis:
+    Pos = 1
+    Move = 2
+
 
 class ValueType:
-    Bool = 0
-    Float = 1
-    
+    Double = 1
+    Vector2 = 2
+    Vector3 = 3
 
-class TriggerType:
-    Release = 'release'
-    Press = 'press'
-    Value = 'value'
-    Hold = 'hold'
-    Combination = 'combination'
-    Repeat = 'repeat'
+
+class AxisSwizzleOrder:
+    XYZ = 'xyz'
+    XZY = 'xzy'
+    YXZ = 'yxz'
+    YZX = 'yzx'
+    ZXY = 'zxy'
+    ZYX = 'zyx'
+
+
+class TriggerState:
+    Empty = 0
+    Ongoing = 1
+    Triggered = 2
+
+
+class InputState:
+    Empty = 0
+    Started = 1
+    Triggered = 2
+    Completed = 3
+    Canceled = 4
+    Ongoing = 5
+
+
+class TriggerCombineType:
+    And = 1
+    Or = 2
+    Not = 3
+
+
+IA_EVENT_PREFIX = 'inputExIA_'
+
+
+class AccumulationBehavior:
+    Override = 0
+    Cumulative = 1
+    HighestAbsValue = 2
