@@ -1,0 +1,15 @@
+{
+    "resource_pack_name": "vanilla",
+    "texture_data": {
+        "sf:shadow_overcharger": {
+            "textures": "textures/items/shadow_overcharger"
+        },
+        "sf:shadow_dampener": {
+            "textures": "textures/items/shadow_dampener"
+        },
+        "sf:shadow_dampener_splash_potion": {
+            "textures": "textures/items/shadow_dampener_splash_potion"
+        }
+    },
+    "texture_name": "atlas.items"
+}

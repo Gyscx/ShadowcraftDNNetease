@@ -1,0 +1,12 @@
+{
+    "format_version": "1.10",
+    "minecraft:item": {
+        "description": {
+            "identifier": "sf:shadow_energy",
+            "category": "Equipment"
+        },
+        "components": {
+            "minecraft:icon": "shadow_energy"
+        }
+    }
+}

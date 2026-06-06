@@ -5,7 +5,10 @@
             {
                 "shadowPanel": {
                     "type": "panel",
-                    "offset": [0, 0],
+                    "offset": [
+                        0,
+                        0
+                    ],
                     "layer": 1,
                     "clip_offset": [
                         0.0,
@@ -47,15 +50,7 @@
                                         "empty_progress_bar@netease_editor_template_namespace.empty_progress_bar": {}
                                     },
                                     {
-                                        "filled_progress_bar@netease_editor_template_namespace.filled_progress_bar": {
-                                            "bindings": [
-                                                {
-                                                    "binding_condition": "always",
-                                                    "binding_name": "#entity_shadow",
-                                                    "binding_name_override": "#clip_ratio"
-                                                }
-                                            ]
-                                        }
+                                        "filled_progress_bar@netease_editor_template_namespace.filled_progress_bar": {}
                                     }
                                 ]
                             }
@@ -81,13 +76,7 @@
                                 ],
                                 "font_type": "default",
                                 "text": "#shadow_data_entity",
-                                "text_alignment": "center",
-                                "bindings": [
-                                    {
-                                        "binding_condition": "always",
-                                        "binding_name": "#shadow_data_entity"
-                                    }
-                                ]
+                                "text_alignment": "center"
                             }
                         }
                     ]

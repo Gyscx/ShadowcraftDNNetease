@@ -3,28 +3,18 @@
         "EnchantSetting": {
             "amplifier": 1
         },
-        "PackResourceSortData": {
-
-        },
+        "PackResourceSortData": {},
         "PlayerEffectSetting": {
             "amplifier": 1,
             "duration": 10
         },
-        "PresetInstanceTreeData": [
-
-        ]
+        "PresetInstanceTreeData": []
     },
     "UI": {
-        "customPrefabGroupExpand": [
-
-        ],
-        "customVariables": {
-
-        },
+        "customPrefabGroupExpand": [],
+        "customVariables": {},
         "expandData": {
-            "prefab": {
-
-            },
+            "prefab": {},
             "screen": {
                 "D:\\MCStudioDownload\\work\\gxc1250378829@163.com\\Cpp\\AddOn\\0332e5d62a8e4419858de530b67b963e\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
                     "/main",

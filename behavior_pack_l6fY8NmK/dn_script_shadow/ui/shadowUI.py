@@ -273,24 +273,42 @@ class ShadowScreenUI(ScreenNode):
                     label.SetText("")
                     label.SetVisible(False)
 
-    def UpdateShadow(self, new_value):
-        """更新暗影能量显示（保持原有逻辑）"""
+    def UpdateShadow(self, new_value, effect=None):
+        """更新暗影能量显示
+        effect: "suppression"=暗影抑制(空), "charging"=暗影充能(满), None=正常
+        """
         old_energy = self.shadowData
-        if new_value < 0.0:
-            new_value = 0.0
-        self.shadow = new_value
-        energy = int(round(100 * (1 - self.shadow)))
-        energy = max(0, min(energy, 100))
-        self.shadowData = energy
-
-        if old_energy < 100 and energy >= 100:
-            notify_comp.SetLeftCornerNotify("暗影能量条已填充完毕，可以释放技能")
-            logger.info("UI: 暗影能量满，发送通知")
-
-        if energy >= 100:
-            self.ability_visible = True
-        elif energy <= 0:
+        
+        # 处理特殊效果
+        if effect == "suppression":
+            # 暗影抑制：能量条始终为空
+            self.shadow = 1.0
+            self.shadowData = 0
             self.ability_visible = False
+            print "[Debug] 暗影抑制效果：能量条为空"
+        elif effect == "charging":
+            # 暗影充能：能量条始终为满
+            self.shadow = 0.0
+            self.shadowData = 100
+            self.ability_visible = True
+            print "[Debug] 暗影充能效果：能量条为满"
+        else:
+            # 正常状态
+            if new_value < 0.0:
+                new_value = 0.0
+            self.shadow = new_value
+            energy = int(round(100 * (1 - self.shadow)))
+            energy = max(0, min(energy, 100))
+            self.shadowData = energy
+
+            if old_energy < 100 and energy >= 100:
+                notify_comp.SetLeftCornerNotify("暗影能量条已填充完毕，可以释放技能")
+                logger.info("UI: 暗影能量满，发送通知")
+
+            if energy >= 100:
+                self.ability_visible = True
+            elif energy <= 0:
+                self.ability_visible = False
 
         self.UpdateAbilityVisibility()
         self.UpdateScreen()
@@ -583,4 +601,3 @@ class ShadowScreenUI(ScreenNode):
     @ViewBinder.binding(ViewBinder.BF_BindString, '#RW_default_texture')
     def ReturnRWDefaultTexture(self):
         return self.RW_default_texture
-

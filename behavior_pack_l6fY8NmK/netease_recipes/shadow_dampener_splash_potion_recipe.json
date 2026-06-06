@@ -1,0 +1,24 @@
+{
+    "format_version": "1.10",
+    "minecraft:recipe_shapeless": {
+        "description": {
+            "identifier": "sf:shadow_dampener_splash_potion_recipe"
+        },
+        "tags": [
+            "crafting_table"
+        ],
+        "ingredients": [
+            {
+                "item": "minecraft:potion",
+                "data": 0
+            },
+            {
+                "item": "sf:shadow_dampener_powder"
+            }
+        ],
+        "result": {
+            "item": "sf:shadow_dampener_splash_potion",
+            "count": 1
+        }
+    }
+}

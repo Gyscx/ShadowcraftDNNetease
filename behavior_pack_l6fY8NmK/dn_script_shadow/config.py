@@ -27,6 +27,7 @@ BindEntityUIEvent = "BindEntityUIEvent"
 UpdateEntityShadowEvent = "UpdateEntityShadowEvent"  # 服务器->客户端：更新实体暗影能量
 RequestEntityShadowDataEvent = "RequestEntityShadowDataEvent"  # 客户端->服务器：请求实体数据
 ResponseEntityShadowDataEvent = "ResponseEntityShadowDataEvent"  # 服务器->客户端：响应实体数据
+PlayerShadowEffectEvent = "PlayerShadowEffectEvent"  # 服务器->客户端：玩家特殊效果（抑制/充能）
 
 shadowUIName = "shadow_energy"
 shadowEntityUIName = "shadowEnergyEntity"
@@ -192,4 +193,3 @@ SKILL_UPGRADE_CONFIG = {
         ]
     }
 }
-

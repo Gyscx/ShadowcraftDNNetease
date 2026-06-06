@@ -1,6 +1,6 @@
 {
     "ui_defs": [
-        "ui/shadow_energy.json",
-        "ui/shadowEnergyEntity.json"
+        "ui/shadowEnergyEntity.json",
+        "ui/shadow_energy.json"
     ]
 }

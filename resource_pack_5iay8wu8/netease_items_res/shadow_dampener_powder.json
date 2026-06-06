@@ -1,0 +1,13 @@
+{
+    "format_version": "1.10",
+    "minecraft:item": {
+        "description": {
+            "identifier": "sf:shadow_dampener_powder"
+        },
+        "components": {
+            "minecraft:icon": {
+                "texture": "shadow_dampener_powder"
+            }
+        }
+    }
+}

@@ -16,12 +16,20 @@ levelId = serverApi.GetLevelId()
 class ShadowServerSystem(ServerSubsystem):
     def onInit(self):
         print "===== Shadow Server System Init (Dynamic) ====="
-        # 新增：服务器维护所有实体的暗影能量状态
+        # 服务器维护所有实体的暗影能量状态
         self.entity_shadow_states = {}  # entity_id -> {"shadow_data": int, "clip_ratio": float}
+        # 实体特殊效果状态
+        self.entity_shadow_effects = {}  # entity_id -> {"effect": "suppression"/"charging"/None}
+        # 玩家特殊效果状态
+        self.player_shadow_effect = None  # "suppression"/"charging"/None
 
     def getEntityShadowState(self, entity_id):
         """获取实体暗影能量状态"""
         return self.entity_shadow_states.get(str(entity_id), {"shadow_data": 0, "clip_ratio": 1.0})
+
+    def getEntityShadowEffect(self, entity_id):
+        """获取实体特殊效果状态"""
+        return self.entity_shadow_effects.get(str(entity_id), {"effect": None})
 
     def setEntityShadowState(self, entity_id, data):
         """设置实体暗影能量状态并广播"""
@@ -31,6 +39,77 @@ class ShadowServerSystem(ServerSubsystem):
         # 广播给所有玩家
         self.broadcastEntityShadowUpdate(entity_id_str, data)
 
+    def applyShadowSuppression(self, entity_id):
+        """应用暗影抑制效果：能量条始终为空（clip_ratio=1）"""
+        entity_id_str = str(entity_id)
+        self.entity_shadow_effects[entity_id_str] = {"effect": "suppression"}
+        # 广播特殊状态
+        self.broadcastEntityShadowUpdate(entity_id_str, {
+            "shadow_data": 0,
+            "clip_ratio": 1.0,
+            "is_full": False,
+            "effect": "suppression"
+        })
+        logger.info("实体 %s 应用暗影抑制效果，能量条为空" % entity_id_str)
+
+    def applyShadowCharging(self, entity_id):
+        """应用暗影充能效果：能量条始终为满（clip_ratio=0）"""
+        entity_id_str = str(entity_id)
+        self.entity_shadow_effects[entity_id_str] = {"effect": "charging"}
+        # 广播特殊状态
+        self.broadcastEntityShadowUpdate(entity_id_str, {
+            "shadow_data": 100,
+            "clip_ratio": 0.0,
+            "is_full": True,
+            "effect": "charging"
+        })
+        logger.info("实体 %s 应用暗影充能效果，能量条为满" % entity_id_str)
+
+    def removeShadowEffect(self, entity_id):
+        """移除特殊效果，恢复正常状态"""
+        entity_id_str = str(entity_id)
+        if entity_id_str in self.entity_shadow_effects:
+            del self.entity_shadow_effects[entity_id_str]
+        # 恢复正常能量数据
+        normal_data = self.getEntityShadowState(entity_id_str)
+        self.broadcastEntityShadowUpdate(entity_id_str, normal_data)
+        logger.info("实体 %s 移除特殊效果，恢复正常" % entity_id_str)
+
+    def applyPlayerShadowSuppression(self, player_id):
+        """应用玩家暗影抑制效果：能量条始终为空"""
+        self.player_shadow_effect = "suppression"
+        self.sendClient(player_id, config.PlayerShadowEffectEvent, {
+            "clip_ratio": 1.0,
+            "shadow_data": 0,
+            "is_full": False,
+            "effect": "suppression"
+        })
+        logger.info("玩家 %s 应用暗影抑制效果" % player_id)
+
+    def applyPlayerShadowCharging(self, player_id):
+        """应用玩家暗影充能效果：能量条始终为满"""
+        self.player_shadow_effect = "charging"
+        self.sendClient(player_id, config.PlayerShadowEffectEvent, {
+            "clip_ratio": 0.0,
+            "shadow_data": 100,
+            "is_full": True,
+            "effect": "charging"
+        })
+        logger.info("玩家 %s 应用暗影充能效果" % player_id)
+
+    def removePlayerShadowEffect(self, player_id):
+        """移除玩家特殊效果，恢复正常状态"""
+        if hasattr(self, 'player_shadow_effect'):
+            del self.player_shadow_effect
+        current_data = self.getPlayerShadowData(player_id)
+        self.sendClient(player_id, config.PlayerShadowEffectEvent, {
+            "clip_ratio": current_data["clip_ratio"],
+            "shadow_data": current_data["shadow_data"],
+            "is_full": current_data["is_full"],
+            "effect": None
+        })
+        logger.info("玩家 %s 移除特殊效果" % player_id)
+
     def broadcastEntityShadowUpdate(self, entity_id, data):
         """向所有玩家广播实体暗影能量更新"""
         player_list = serverApi.GetPlayerList()
@@ -39,7 +118,8 @@ class ShadowServerSystem(ServerSubsystem):
                 "entityId": entity_id,
                 "shadow_data": data["shadow_data"],
                 "clip_ratio": data["clip_ratio"],
-                "is_full": data.get("is_full", False)
+                "is_full": data.get("is_full", False),
+                "effect": data.get("effect")  # 包含特殊效果标记
             })
 
     def SendShadowEnergyToEntity(self, entity_id, amount):
@@ -392,7 +472,8 @@ class ShadowServerSystem(ServerSubsystem):
             entity_id = args.entityId
             identifier = args.identifier
 
-            if identifier.find("minecraft") != -1:
+            # 只对 sf: 开头的实体创建UI
+            if identifier.startswith("sf:"):
                 # 确保初始化实体暗影能量状态为0
                 initial_state = {
                     "shadow_data": 0,  # 强制为0
@@ -415,6 +496,8 @@ class ShadowServerSystem(ServerSubsystem):
                     self.NotifyClientToBindUI(entity_id)
                 else:
                     logger.warning("实体 %s 已存在，跳过重复初始化" % entity_id_str)
+            else:
+                logger.info("实体 %s 不是 sf: 开头，跳过UI创建" % identifier)
 
         except Exception as e:
             logger.error("OnServerSpawnMob error: %s" % str(e))
@@ -541,3 +624,118 @@ class ShadowServerSystem(ServerSubsystem):
             "clip_ratio": entity_data.get("clip_ratio", 1.0),
             "is_full": entity_data.get("is_full", False)
         })
+
+    @EventListener("AddEffectServerEvent")
+    def OnEffectAdded(self, args):
+        logger.info("AddEffectServerEvent")
+        entityId = args.entityId
+        effectName = args.effectName
+        player_list = serverApi.GetPlayerList()
+
+        if entityId in player_list:
+            # 玩家获得效果
+            if effectName == "sf:shadow_dampener_effect":
+                # 先移除充能效果（如果存在）
+                if hasattr(self, 'player_shadow_effect') and self.player_shadow_effect == "charging":
+                    logger.info("玩家 %s 移除暗影充能效果" % entityId)
+                self.player_shadow_effect = "suppression"
+                self.sendClient(entityId, config.PlayerShadowEffectEvent, {
+                    "clip_ratio": 1.0,
+                    "shadow_data": 0,
+                    "is_full": False,
+                    "effect": "suppression"
+                })
+                logger.info("玩家 %s 应用暗影抑制效果" % entityId)
+            elif effectName == "sf:shadow_overcharger_effect":
+                # 先移除抑制效果（如果存在）
+                if hasattr(self, 'player_shadow_effect') and self.player_shadow_effect == "suppression":
+                    logger.info("玩家 %s 移除暗影抑制效果" % entityId)
+                self.player_shadow_effect = "charging"
+                self.sendClient(entityId, config.PlayerShadowEffectEvent, {
+                    "clip_ratio": 0.0,
+                    "shadow_data": 100,
+                    "is_full": True,
+                    "effect": "charging"
+                })
+                logger.info("玩家 %s 应用暗影充能效果" % entityId)
+        else:
+            # 实体获得效果
+            entity_id_str = str(entityId)
+            if effectName == "sf:shadow_dampener_effect":
+                # 先移除充能效果（如果存在）
+                if entity_id_str in self.entity_shadow_effects and self.entity_shadow_effects[entity_id_str].get("effect") == "charging":
+                    logger.info("实体 %s 移除暗影充能效果" % entity_id_str)
+                self.entity_shadow_effects[entity_id_str] = {"effect": "suppression"}
+                self.broadcastEntityShadowUpdate(entity_id_str, {
+                    "shadow_data": 0,
+                    "clip_ratio": 1.0,
+                    "is_full": False,
+                    "effect": "suppression"
+                })
+                logger.info("实体 %s 应用暗影抑制效果" % entity_id_str)
+            elif effectName == "sf:shadow_overcharger_effect":
+                # 先移除抑制效果（如果存在）
+                if entity_id_str in self.entity_shadow_effects and self.entity_shadow_effects[entity_id_str].get("effect") == "suppression":
+                    logger.info("实体 %s 移除暗影抑制效果" % entity_id_str)
+                self.entity_shadow_effects[entity_id_str] = {"effect": "charging"}
+                self.broadcastEntityShadowUpdate(entity_id_str, {
+                    "shadow_data": 100,
+                    "clip_ratio": 0.0,
+                    "is_full": True,
+                    "effect": "charging"
+                })
+                logger.info("实体 %s 应用暗影充能效果" % entity_id_str)
+
+    @EventListener("RemoveEffectServerEvent")
+    def OnEffectRemoved(self, args):
+        logger.info("RemoveEffectServerEvent")
+        entityId = args.entityId
+        effectName = args.effectName
+        player_list = serverApi.GetPlayerList()
+
+        if entityId in player_list:
+            # 玩家移除效果
+            self.removePlayerShadowEffect(entityId)
+        else:
+            # 实体移除效果
+            self.removeShadowEffect(entityId)
+    
+    @EventListener("RefreshEffectServerEvent")
+    def OnEffectRefreshed(self, args):
+        logger.info("RefreshEffectServerEvent")
+        entityId = args.entityId
+        effectName = args.effectName
+        player_list = serverApi.GetPlayerList()
+
+        if entityId in player_list:
+            # 玩家获得效果
+            if effectName == "sf:shadow_dampener_effect":
+                # self.removePlayerShadowEffect(entityId)
+                self.applyPlayerShadowSuppression(entityId)
+            elif effectName == "sf:shadow_overcharger_effect":
+                # self.removePlayerShadowEffect(entityId)
+                self.applyPlayerShadowCharging(entityId)
+        else:
+            # 实体获得效果
+            if effectName == "sf:shadow_dampener_effect":
+                # self.removeShadowEffect(entityId)
+                self.applyShadowSuppression(entityId)
+            elif effectName == "sf:shadow_overcharger_effect":
+                # self.removeShadowEffect(entityId)
+                self.applyShadowCharging(entityId)
+
+    @EventListener("ScriptBlockEventServer")
+    def OnScriptBlockEvent(self, args):
+        """处理脚本块事件，监听实体标签变化"""
+        event_name = args.eventName
+        entity_id = args.entityId
+        player_list = serverApi.GetPlayerList()
+
+        if entity_id and entity_id not in player_list:
+            # 只处理非玩家实体
+            if event_name == "shadow_dampener_applied":
+                # 实体获得暗影抑制效果
+                self.applyShadowSuppression(entity_id)
+            elif event_name == "shadow_dampener_removed":
+                # 实体移除暗影抑制效果
+                self.removeShadowEffect(entity_id)

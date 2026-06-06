@@ -454,13 +454,13 @@ class ShadowClientSystem(ClientSubsystem):
 
             entity_id_str = str(entity_id_int)
 
-            can_bind = clientApi.CheckCanBindUI(entity_id_int)
+            can_bind = clientApi.CheckCanBindUI(str(entity_id_int))
             if not can_bind:
-                logger.warning("实体 %s 暂时无法绑定UI，等待后重试" % entity_id_int)
-                print "实体 %s 暂时无法绑定UI，等待后重试" % entity_id_int
-                # 延迟1秒后重试
+                logger.warning("实体 %s 暂时无法绑定UI，等待1帧后重试" % entity_id_int)
+                print "实体 %s 暂时无法绑定UI，等待1帧后重试" % entity_id_int
+                # 延迟1帧(约0.05秒)后重试，实体创建后需要等待几帧才能绑定
                 time_comp = CCF.CreateGame(levelId)
-                time_comp.AddTimer(1.0, lambda: self.retryBindUI(entity_id_str))
+                time_comp.AddTimer(0.05, lambda: self.retryBindUI(entity_id_str))
                 return
 
             # 为实体初始化独立的暗影能量数据
@@ -483,7 +483,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_int,
+                    "bindEntityId": str(entity_id_int),
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
@@ -520,10 +520,15 @@ class ShadowClientSystem(ClientSubsystem):
             import traceback
             traceback.print_exc()  # 打印完整的堆栈信息
 
-    def retryBindUI(self, entity_id_str):
-        """重试绑定实体UI"""
+    def retryBindUI(self, entity_id_str, retry_count=0):
+        """重试绑定实体UI，支持多帧快速重试"""
         try:
-            print "重试为实体 %s 绑定UI" % entity_id_str
+            max_retries = 10  # 最多重试10次（约0.5秒）
+            if retry_count >= max_retries:
+                print "实体 %s 绑定UI重试次数已达上限，放弃" % entity_id_str
+                return
+
+            print "第%s次重试为实体 %s 绑定UI" % (retry_count + 1, entity_id_str)
 
             # 检查实体是否仍然存在
             try:
@@ -532,10 +537,12 @@ class ShadowClientSystem(ClientSubsystem):
                 print "实体ID %s 不是有效的整数" % entity_id_str
                 return
 
-            # +++ 关键修复：CheckCanBindUI期望整数
-            can_bind = clientApi.CheckCanBindUI(entity_id_int)
+            can_bind = clientApi.CheckCanBindUI(str(entity_id_int))
             if not can_bind:
-                print "实体 %s 仍然无法绑定UI，放弃重试" % entity_id_str
+                print "实体 %s 仍然无法绑定UI，第%s次重试..." % (entity_id_str, retry_count + 1)
+                # 继续快速重试，每帧尝试一次
+                time_comp = CCF.CreateGame(levelId)
+                time_comp.AddTimer(0.05, lambda rc=retry_count: self.retryBindUI(entity_id_str, rc + 1))
                 return
 
             # 检查是否已存在UI节点
@@ -547,7 +554,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_int,
+                    "bindEntityId": str(entity_id_int),
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
@@ -675,7 +682,7 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.CreateUI(
                 config.ModName, config.shadowEntityUIName,
                 {
-                    "bindEntityId": entity_id_int,
+                    "bindEntityId": str(entity_id_int),
                     "bindOffset": (0, 2.5, 0),
                     "autoScale": 1
                 }
@@ -687,13 +694,13 @@ class ShadowClientSystem(ClientSubsystem):
                 print "自动创建成功：为实体 %s 创建UI" % entity_id_str
 
                 # 使用传入的数据更新UI
-                ui_node.UpdateEntityShadow(data["clip_ratio"])
+                ui_node.UpdateEntityShadow(data["clip_ratio"], data.get("effect"))
             else:
                 print "自动创建失败：为实体 %s 创建UI失败" % entity_id_str
                 # 延迟1秒后重试
                 if retry_count < 3:
                     time_comp = CCF.CreateGame(levelId)
-                    time_comp.AddTimer(1.0, lambda: self.tryAutoCreateUI(entity_id_str, data, retry_count + 1))
+                    time_comp.AddTimer(1.0, lambda rc=retry_count: self.tryAutoCreateUI(entity_id_str, data, rc + 1))
 
         except Exception as e:
             print "tryAutoCreateUI error: %s" % str(e)
@@ -774,6 +781,7 @@ class ShadowClientSystem(ClientSubsystem):
         shadow_data = args.shadow_data
         clip_ratio = args.clip_ratio
         is_full = args.is_full
+        effect = getattr(args, 'effect', None)  # 获取特殊效果标记
 
         if not entity_id:
             return
@@ -784,7 +792,8 @@ class ShadowClientSystem(ClientSubsystem):
         updated_data = {
             "clip_ratio": clip_ratio,
             "shadow_data": shadow_data,
-            "is_full": is_full
+            "is_full": is_full,
+            "effect": effect
         }
 
         # 更新本地数据存储
@@ -801,9 +810,8 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = self.entity_ui_nodes[entity_id_str]
             if ui_node and hasattr(ui_node, 'UpdateEntityShadow'):
                 try:
-                    print "[Debug] 更新实体 %s 的UI，ratio=%s" % (entity_id_str, data["clip_ratio"])
-                    ui_node.UpdateEntityShadow(data["clip_ratio"])
-                    ui_node.UpdateScreen()
+                    print "[Debug] 更新实体 %s 的UI，ratio=%s, effect=%s" % (entity_id_str, data["clip_ratio"], data.get("effect"))
+                    ui_node.UpdateEntityShadow(data["clip_ratio"], data.get("effect"))
                 except Exception as e:
                     logger.error("更新实体 %s UI失败: %s" % (entity_id_str, str(e)))
                     if entity_id_str in self.entity_ui_nodes:
@@ -864,6 +872,20 @@ class ShadowClientSystem(ClientSubsystem):
             ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
             if ui_node:
                 ui_node.UpdateShadow(new_ratio)
+
+    @CustomEvent(config.PlayerShadowEffectEvent)
+    def OnPlayerShadowEffect(self, args):
+        """处理服务器下发的玩家特殊效果"""
+        effect = getattr(args, 'effect', None)
+        clip_ratio = args.clip_ratio
+        shadow_data = args.shadow_data
+        is_full = args.is_full
+
+        print "[Debug] 收到玩家特殊效果: effect=%s, ratio=%s" % (effect, clip_ratio)
+
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        if ui_node:
+            ui_node.UpdateShadow(clip_ratio, effect)
 
     @CustomEvent(config.UpgradeSkillResultEvent)
     def OnUpgradeSkillResult(self, args):

@@ -1,0 +1,4 @@
+item.sf:shadow_dampener.name=暗影抑制剂
+item.sf:shadow_overcharger.name=暗影充能剂
+sf:shadow_dampener_effect=暗影抑制
+sf:shadow_overcharger_effect=暗影充能

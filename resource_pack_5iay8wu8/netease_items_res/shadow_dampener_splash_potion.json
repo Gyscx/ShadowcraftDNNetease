@@ -1,0 +1,11 @@
+{
+    "format_version": "1.10",
+    "minecraft:item": {
+        "description": {
+            "identifier": "sf:shadow_dampener_splash_potion"
+        },
+        "components": {
+            "minecraft:icon": "sf:shadow_dampener_splash_potion"
+        }
+    }
+}

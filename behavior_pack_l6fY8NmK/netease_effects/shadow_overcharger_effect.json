@@ -1,0 +1,16 @@
+{
+  "format_version": "1.10",
+  "minecraft:effect": {
+    "description": {
+      "identifier": "sf:shadow_overcharger_effect"
+    },
+    "components": {
+      "minecraft:particle_color": [
+        26,
+        122,
+        133
+      ],
+      "minecraft:icon": "shadow_overcharger"
+    }
+  }
+}
