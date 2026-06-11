@@ -1,0 +1,18 @@
+{
+    "format_version": "0.0.1",
+    "name": "shadow_system",
+    "description": "控制实体或玩家的暗影能量条",
+    "permission_level": "game_directors",
+    "args": [
+        {
+            "name": "目标实体或玩家选择器",
+            "type": "target",
+            "default": "@s"
+        },
+        {
+            "name": "暗影能量值",
+            "type": "int",
+            "default": 0
+        }
+    ]
+}

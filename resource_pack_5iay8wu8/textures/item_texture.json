@@ -9,6 +9,9 @@
         },
         "sf:shadow_dampener_splash_potion": {
             "textures": "textures/items/shadow_dampener_splash_potion"
+        },
+        "sf:shadow_dampener_powder": {
+            "textures": "textures/ui/shadow_dampener_effect"
         }
     },
     "texture_name": "atlas.items"

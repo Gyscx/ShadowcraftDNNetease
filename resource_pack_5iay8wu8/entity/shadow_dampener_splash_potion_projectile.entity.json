@@ -4,11 +4,10 @@
         "description": {
             "identifier": "sf:shadow_dampener_splash_potion_projectile",
             "materials": {
-                "default": "splash_potion_enchanted"
+                "default": "entity_alphatest"
             },
             "textures": {
-                "default": "textures/items/shadow_dampener",
-                "enchanted": "textures/misc/enchanted_item_glint"
+                "default": "textures/items/shadow_dampener"
             },
             "geometry": {
                 "default": "geometry.item_sprite"

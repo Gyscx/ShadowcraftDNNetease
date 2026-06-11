@@ -12,13 +12,12 @@
                 "item": "minecraft:gunpowder"
             },
             {
-                "item": "minecraft:coal",
-                "data": 0
+                "item": "minecraft:coal"
             }
         ],
         "result": {
             "item": "sf:shadow_dampener_powder",
-            "count": 2
+            "count": 1
         }
     }
 }

@@ -28,6 +28,7 @@ UpdateEntityShadowEvent = "UpdateEntityShadowEvent"  # 服务器->客户端：�
 RequestEntityShadowDataEvent = "RequestEntityShadowDataEvent"  # 客户端->服务器：请求实体数据
 ResponseEntityShadowDataEvent = "ResponseEntityShadowDataEvent"  # 服务器->客户端：响应实体数据
 PlayerShadowEffectEvent = "PlayerShadowEffectEvent"  # 服务器->客户端：玩家特殊效果（抑制/充能）
+SetPlayerShadowEnergyEvent = "SetPlayerShadowEnergyEvent"  # 服务器->客户端：设置玩家暗影能量值
 
 shadowUIName = "shadow_energy"
 shadowEntityUIName = "shadowEnergyEntity"
@@ -54,24 +55,18 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "eruption",  # 使用 eruption 贴图
                 "server_commands": [
-                    "/damage @e[r=3,type=!player] 30 entity_attack entity @s",
                     "/playanimation @s animation.player.eruption",
-                    "/camerashake add @s 2 0.1",
-                    "/playsound mob.shulker.shoot @s",
-                    "/execute as @s at @s run particle sf:eruption"
+                    "/playsound mob.shulker.shoot @s"
                 ]
             },
             {
                 "item_identifier": "sf:crescent_visor",
                 "item_slot_type": "armor",
                 "hotbar_slot": -1,
-                "texture_name": "shadow_blast",  # 使用 shadow_blast 贴图
+                "texture_name": "eruption",  # 使用 eruption 贴图
                 "server_commands": [
-                    "/damage @e[r=3,type=!player] 30 entity_attack entity @s",
                     "/playanimation @s animation.player.eruption",
-                    "/camerashake add @s 2 0.1",
-                    "/playsound mob.shulker.shoot @s",
-                    "/execute as @s at @s run particle sf:eruption"
+                    "/playsound mob.shulker.shoot @s"
                 ]
             }
         ]
@@ -92,10 +87,10 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "blast",  # 原texture_name字段的值
                 "server_commands": [
-                    "/playanimation @s animation.player.eruption",
+                    "/playanimation @s animation.player.blast",
                     "/camerashake add @s 2 0.1",
                     "/playsound mob.shulker.shoot @s",
-                    "/execute as @s at @s run particle sf:eruption"
+                    "/execute as @s at @s run particle sf:blast"
                 ]
             }
         ]

@@ -5,9 +5,7 @@
             "identifier": "sf:shadow_dampener_powder"
         },
         "components": {
-            "minecraft:icon": {
-                "texture": "shadow_dampener_powder"
-            }
+            "minecraft:icon": "sf:shadow_dampener_powder"
         }
     }
 }

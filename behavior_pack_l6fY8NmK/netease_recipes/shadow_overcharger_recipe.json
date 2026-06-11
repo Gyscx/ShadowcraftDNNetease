@@ -2,22 +2,22 @@
     "format_version": "1.10",
     "minecraft:recipe_shapeless": {
         "description": {
-            "identifier": "sf:shadow_dampener_splash_potion_recipe"
+            "identifier": "sf:shadow_overcharger_recipe"
         },
         "tags": [
             "crafting_table"
         ],
         "ingredients": [
             {
-                "item": "minecraft:splash_potion",
+                "item": "minecraft:potion",
                 "data": 0
             },
             {
-                "item": "sf:shadow_dampener_powder"
+                "item": "sf:shadow_energy"
             }
         ],
         "result": {
-            "item": "sf:shadow_dampener_splash_potion",
+            "item": "sf:shadow_overcharger",
             "count": 1
         }
     }

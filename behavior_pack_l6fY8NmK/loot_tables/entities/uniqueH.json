@@ -1,0 +1,61 @@
+{
+    "pools": [
+        {
+            "rolls": 1,
+            "entries": [
+                {
+                    "type": "item",
+                    "name": "sf:eye_of_time",
+                    "weight": 1,
+                    "functions": [
+                        {
+                            "function": "enchant_random_gear",
+                            "chance": 0.12
+                        },
+                        {
+                            "function": "random_dye"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "rolls": 1,
+            "entries": [
+                {
+                    "type": "item",
+                    "name": "sf:burden_of_loneliness",
+                    "weight": 1,
+                    "functions": [
+                        {
+                            "function": "enchant_random_gear",
+                            "chance": 0.12
+                        },
+                        {
+                            "function": "random_dye"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "rolls": 1,
+            "entries": [
+                {
+                    "type": "item",
+                    "name": "sf:world_slicer",
+                    "weight": 1,
+                    "functions": [
+                        {
+                            "function": "enchant_random_gear",
+                            "chance": 0.12
+                        },
+                        {
+                            "function": "random_dye"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

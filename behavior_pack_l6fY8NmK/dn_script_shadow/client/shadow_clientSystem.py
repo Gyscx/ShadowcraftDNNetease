@@ -11,8 +11,8 @@ CCF = clientApi.GetEngineCompFactory()
 levelId = clientApi.GetLevelId()
 notify_comp = CCF.CreateTextNotifyClient(levelId)
 config_comp = CCF.CreateConfigClient(levelId)
-damage_shadow = -0.15
-attack_shadow = -1
+damage_shadow = -0.10
+attack_shadow = -0.03
 playerId = clientApi.GetLocalPlayerId()
 
 @SubsystemClient
@@ -732,7 +732,11 @@ class ShadowClientSystem(ClientSubsystem):
 
         current_energy = current_data.get("shadow_data", 0)
         new_energy = current_energy + amount
-
+        
+        # 确保能量值在0-100范围内，防止出现负数
+        if new_energy < 0:
+            logger.warning("客户端：能量值计算为负数 (%s + %s = %s)，修正为0" % (current_energy, amount, new_energy))
+            new_energy = 0
         if new_energy > 100:
             new_energy = 100
 
@@ -823,55 +827,21 @@ class ShadowClientSystem(ClientSubsystem):
 
     @CustomEvent(config.DamageEvent)
     def OnDamageEvent(self, args):
-        """客户端玩家受伤事件"""
+        """客户端玩家受伤事件 - 不再本地修改能量，由服务端同步"""
         entityId = args.entityId
         print entityId
         if entityId in clientApi.GetPlayerList():
-            print("客户端-玩家已受伤")
-            # 获取当前数据（包含 is_full 字段）
-            current_data = config_comp.GetConfigData("dn_shadow_energy")
-            if not current_data:
-                current_data = {"clip_ratio": 1.0, "shadow_data": 0, "is_full": False}
-            current_ratio = current_data.get("clip_ratio", 1.0)
-            new_ratio = current_ratio + damage_shadow
-            if new_ratio < 0.0:
-                new_ratio = 0.0
-            # 可选：限制上限，避免能量超过100时无法正常触发
-            if new_ratio > 1.0:
-                new_ratio = 1.0
-            new_shadow_data = int(round(100 * (1 - new_ratio)))
-            # 直接修改原字典，保留 is_full
-            current_data["clip_ratio"] = new_ratio
-            current_data["shadow_data"] = new_shadow_data
-            config_comp.SetConfigData("dn_shadow_energy", current_data)
-            print("客户端-受伤后数据更新: %s" % current_data)
-            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-            if ui_node:
-                ui_node.UpdateShadow(new_ratio)
+            print("客户端-玩家已受伤，能量值由服务端同步")
+            # 注意：不再本地修改能量值，完全由服务端通过 AddShadowEnergyEvent 同步
 
     @EventListener(config.PlayerAttackEntityEvent)
     def OnPlayerAttackEvent(self, args):
-        """客户端玩家攻击事件"""
+        """客户端玩家攻击事件 - 不再本地修改能量，由服务端同步"""
         playerId = args.playerId
         print playerId
         if playerId in clientApi.GetPlayerList():
-            print("客户端-玩家已攻击")
-            current_data = config_comp.GetConfigData("dn_shadow_energy") or {"clip_ratio": 1.0, "shadow_data": 0, "is_full": False}
-            current_ratio = current_data.get("clip_ratio", 1.0)
-            # 根据实际逻辑调整加减方向
-            new_ratio = current_ratio + attack_shadow  # 若攻击应消耗能量，请改为减法
-            if new_ratio < 0.0:
-                new_ratio = 0.0
-            if new_ratio > 1.0:
-                new_ratio = 1.0
-            new_shadow_data = int(round(100 * (1 - new_ratio)))
-            current_data["clip_ratio"] = new_ratio
-            current_data["shadow_data"] = new_shadow_data
-            config_comp.SetConfigData("dn_shadow_energy", current_data)
-            print("客户端-攻击后数据更新: %s" % current_data)
-            ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
-            if ui_node:
-                ui_node.UpdateShadow(new_ratio)
+            print("客户端-玩家已攻击，能量值由服务端同步")
+            # 注意：不再本地修改能量值，完全由服务端通过 AddShadowEnergyEvent 同步
 
     @CustomEvent(config.PlayerShadowEffectEvent)
     def OnPlayerShadowEffect(self, args):
@@ -886,6 +856,37 @@ class ShadowClientSystem(ClientSubsystem):
         ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
         if ui_node:
             ui_node.UpdateShadow(clip_ratio, effect)
+
+    @CustomEvent(config.SetPlayerShadowEnergyEvent)
+    def OnSetPlayerShadowEnergy(self, args):
+        """处理服务器下发的设置玩家暗影能量值"""
+        # 使用更安全的方式获取参数
+        args_dict = args.dict()
+        print "[Debug] OnSetPlayerShadowEnergy 收到事件: %s" % args_dict
+        energy_value = args_dict.get("energy_value", 0)
+
+        print "[Debug] 收到设置玩家能量事件: energy_value=%s" % energy_value
+
+        # 计算新的能量状态
+        new_ratio = 1.0 - (energy_value / 100.0)
+        new_data = {
+            "clip_ratio": new_ratio,
+            "shadow_data": energy_value,
+            "is_full": (energy_value >= 100)
+        }
+
+        # 保存到配置
+        config_comp.SetConfigData("dn_shadow_energy", new_data)
+        print "玩家暗影能量设置为: %s" % energy_value
+
+        # 更新玩家UI
+        ui_node = clientApi.GetUI(config.ModName, config.shadowUIName)
+        print "[Debug] 获取UI节点: %s" % ui_node
+        if ui_node:
+            print "[Debug] 调用 UpdateShadow, new_ratio=%s" % new_ratio
+            ui_node.UpdateShadow(new_ratio)
+        else:
+            print "[Debug] UI节点为空，无法更新"
 
     @CustomEvent(config.UpgradeSkillResultEvent)
     def OnUpgradeSkillResult(self, args):

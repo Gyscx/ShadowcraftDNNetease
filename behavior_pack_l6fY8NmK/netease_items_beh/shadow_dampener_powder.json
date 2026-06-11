@@ -3,18 +3,11 @@
     "minecraft:item": {
         "description": {
             "identifier": "sf:shadow_dampener_powder",
-            "category": "items"
+            "category": "Equipment"
         },
         "components": {
-            "minecraft:icon": {
-                "texture": "shadow_dampener_powder"
-            },
-            "minecraft:display_name": {
-                "value": "暗影抑制粉末"
-            },
             "minecraft:max_stack_size": 64,
-            "minecraft:hand_equipped": false,
-            "minecraft:foil": false
+            "minecraft:foil": true
         }
     }
 }

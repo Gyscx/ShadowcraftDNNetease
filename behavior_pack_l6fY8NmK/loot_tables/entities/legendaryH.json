@@ -1,0 +1,355 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "item",
+          "name": "sf:mind_protector",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:shadowdivers_muzzle",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:crescent_visor",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:masters_beak",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:gaze_into_infinity",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:infinite_journey",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:duality_hypothesis",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:puppet",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "item",
+          "name": "sf:agony_gleam",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:shadowdiving_suit",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:final_judgement",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:midnight_flight",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:demons_robe",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:council_of_seven",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:shell_of_genesis",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:forests_postmortem",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "item",
+          "name": "sf:fates_end",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:branches_of_pain",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:will_of_many",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:battle_of_laws",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:blade_of_timelessness",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:ravens_talon",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:cyan_talons",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        },
+        {
+          "type": "item",
+          "name": "sf:shadow_slayer",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "enchant_random_gear",
+              "chance": 0.14
+            },
+            {
+              "function": "random_dye"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
