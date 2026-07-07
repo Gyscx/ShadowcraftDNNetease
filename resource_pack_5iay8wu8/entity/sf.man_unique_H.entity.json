@@ -71,7 +71,11 @@
 				"sneaking": "animation.humanoid.sneaking",
 				"bob": "animation.humanoid.bob",
 				"damage_nearby_mobs": "animation.humanoid.damage_nearby_mobs",
-				"use_item_progress": "animation.humanoid.use_item_progress"
+				"use_item_progress": "animation.humanoid.use_item_progress",
+				"katana.idle": "animation.player.shadow.katana.idle",
+				"katana.attack1": "animation.player.shadow.katana.attack1",
+				"katana.attack2": "animation.player.shadow.katana.attack2",
+				"katana.chasing": "animation.player.shadow.katana.chasing"
 			},
 			"animation_controllers": [
 				{
@@ -115,13 +119,19 @@
 				},
 				{
 					"swimming": "controller.animation.zombie.swimming"
+				},
+				{
+					"katana": "controller.animation.dn.player.katana.controller"
 				}
 			],
 			"render_controllers": [
 				"controller.render.skin_custom.hair.third_person",
 				"controller.render.skin_custom.face.third_person"
 			],
-			"enable_attachables": true
+			"enable_attachables": true,
+			"sound_effects": {
+				"katana.attack": "shadow.attack.katana"
+			}
 		}
 	}
 }

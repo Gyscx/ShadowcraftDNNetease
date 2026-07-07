@@ -1,0 +1,41 @@
+{
+    "format_version": "1.14.0",
+    "sound_definitions": {
+        "shadow.ability.eruption": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/ability/eruption"
+            ]
+        },
+        "shadow.ability.blast": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/ability/blast"
+            ]
+        },
+        "shadow.ability.shadow_onslaught": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/ability/shadow_onslaught"
+            ]
+        },
+        "shadow.ability.shadow_blast": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/ability/shadow_blast"
+            ]
+        },
+        "shadow.ability.windmill": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/ability/windmill"
+            ]
+        },
+        "shadow.attack.katana": {
+            "category": "neutral",
+            "sounds": [
+                "sounds/attack/katana.attack"
+            ]
+        }
+    }
+}

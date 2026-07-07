@@ -6,9 +6,9 @@
 				"identifier": "geometry.dn.player.custom",
 				"texture_width": 64,
 				"texture_height": 64,
-				"visible_bounds_width": 3,
-				"visible_bounds_height": 3,
-				"visible_bounds_offset": [0, 1.5, 0]
+				"visible_bounds_width": 4,
+				"visible_bounds_height": 4,
+				"visible_bounds_offset": [0, 2, 0]
 			},
 			"bones": [
 				{
@@ -139,6 +139,13 @@
 					"pivot": [-5, 22, 0],
 					"locators": {
 						"s1": [-6, 11, 0]
+					}
+				},
+				{
+					"name": "loc2",
+					"pivot": [0, 0, 0],
+					"locators": {
+						"s2": [0, 18, 3]
 					}
 				}
 			]

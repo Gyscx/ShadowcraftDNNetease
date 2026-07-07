@@ -1,10 +1,28 @@
+# coding=utf-8
+"""
+引擎约束说明 (Engine Constraint Notes)
+
+1. `if 1 > 2: return cls()` 模式出现在多个组件操作函数中
+   （createComponent, getOneComponent, getOrCreateComponent 等）。
+   这是 Python 2.7 缺少 typing 模块的务实变通——静态分析工具（VS Code / PyCharm）
+   可通过此分支推导返回类型。Python 3 迁移后应替换为 TYPE_CHECKING 守卫。
+
+2. 所有组件的创建/销毁/注册均通过网易引擎 API（CreateComponent / DestroyComponent /
+   RegisterComponent）完成，不具独立运行能力。
+
+3. compIndex（反向索引）和 entityMarker（实体标记器）维护了服务端/客户端两套全局实例，
+   通过 isServer() 分支选择。
+"""
 from ..conf import COMPONENT_NAMESPACE, COMPONENT_TAG, PERSIST_INFO
 from ..core.annotation import AnnotationHelper
 from ..core.contextRecorder import ContextRecorder
 from ..core.basic import isServer, clientApi, serverApi, levelId
+from ..core.log import info as _log_info, error as _log_error
+from ..event.core import EventSignal
 from ..persistent.client import ClientKVDatabase, ClientKVDatabaseGlobal
 from ..persistent.server import ServerKVDatabase
 from .common import _nativeCompGet
+from .schema import initComponentFields
 
 clientCompCls = []
 serverCompCls = []
@@ -13,6 +31,9 @@ components = {}
 
 def singletonId():
     return levelId()
+
+
+EMPTY_SLOT = {}
 
 
 def _registerComponent(isServer, cls, persist=False, singleton=False):
@@ -51,9 +72,9 @@ def _registerCompsIntoGame(isHost):
     for cls in clsList:
         result = api.RegisterComponent(COMPONENT_NAMESPACE, cls.__name__, cls.__module__ + '.' + cls.__name__)
         if result:
-            print('[INFO] Registered {} component "{}"'.format('server' if isHost else 'client', cls.__name__))
+            _log_info('Registered {} component "{}"', 'server' if isHost else 'client', cls.__name__)
         else:
-            print('[ERROR] Failed to register {} component "{}"'.format('server' if isHost else 'client', cls.__name__))
+            _log_error('Failed to register {} component "{}"', 'server' if isHost else 'client', cls.__name__)
 
 
 def getComponentAnnotation(cls):
@@ -64,18 +85,27 @@ def isPersistComponent(cls):
     ann = getComponentAnnotation(cls)
     return ann is not None and ann.get('persist', False) # type: ignore
 
+def isSingletonComponent(cls):
+    ann = getComponentAnnotation(cls)
+    return ann is not None and ann.get('singleton', False) # type: ignore
+
 class Marker:
     def __init__(self):
         self.marked = {}
+        self.onEntityCreated = EventSignal()
+        self.onEntityDestroyed = EventSignal()
     
     def mark(self, entityId):
         cur = self.marked.get(entityId, 0)
         self.marked[entityId] = cur + 1
+        if cur == 0:
+            self.onEntityCreated.emit(entityId)
 
     def unmark(self, entityId):
         cur = self.marked.get(entityId, 0) - 1
         if cur <= 0:
             self.marked.pop(entityId, None)
+            self.onEntityDestroyed.emit(entityId)
             return
         else:
             self.marked[entityId] = cur
@@ -87,11 +117,89 @@ class Marker:
         return entityId in self.marked
 
 
+class CompIndex:
+    """
+    组件名 -> 持有该组件的实体 ID 集合的反向索引
+    增删组件时同步维护, Query 时取交集避免全量实体遍历
+    """
+    def __init__(self):
+        self._index = {}  # type: dict[str, set[str]]
+
+    def add(self, entityId, compName):
+        # type: (str, str) -> None
+        if compName not in self._index:
+            self._index[compName] = set()
+        self._index[compName].add(entityId)
+
+    def remove(self, entityId, compName):
+        # type: (str, str) -> None
+        entitySet = self._index.get(compName)
+        if entitySet:
+            entitySet.discard(entityId)
+            if not entitySet:
+                del self._index[compName]
+
+    def getEntitiesWith(self, compName):
+        # type: (str) -> set[str]
+        return self._index.get(compName, set())
+
+    def queryEntities(self, targets, required, excluded):
+        # type: (list, list, list) -> list[str]
+        """
+        返回同时拥有所有 targets + required、
+        且不包含任何 excluded 的实体 ID 列表
+        """
+        # 收集所有需要求交集的集合
+        allSets = []  # type: list[set[str]]
+        filtered = filter(lambda cls: type(cls) is str or not isSingletonComponent(cls), targets + required)
+        names = filter(lambda name: not name.startswith('#'), map(lambda comp: comp if type(comp) == str else comp.__name__, filtered))
+
+        for name in names:
+            entitySet = self._index.get(name)
+            if entitySet is None:
+                return []  # 速败: 没有任何实体持有此组件
+            allSets.append(entitySet)
+
+        if not allSets:
+            # No targets or required: fallback to full scan
+            import warnings
+            warnings.warn(
+                'CompIndex.queryEntities: no targets or required specified, '
+                'falling back to full entity scan.',
+                RuntimeWarning
+            )
+            return list(_getEntityMarker().getMarkedEntities())
+
+        # 按集合大小升序排列 (从最小的集合开始, 加速交集)
+        allSets.sort(key=len)
+
+        # 多集合交集
+        result = set(allSets[0])
+        for s in allSets[1:]:
+            result &= s
+
+        # 减去 excluded
+        for comp in excluded:
+            name = comp if type(comp) == str else comp.__name__
+            excludeSet = self._index.get(name)
+            if excludeSet:
+                result -= excludeSet
+
+        return list(result)
+
+
 entitiesServer = Marker()
 entitiesClient = Marker()
 
+_compIndexServer = CompIndex()
+_compIndexClient = CompIndex()
+
 def _getEntityMarker():
     return entitiesServer if isServer() else entitiesClient
+
+def _getCompIndex():
+    # type: () -> CompIndex
+    return _compIndexServer if isServer() else _compIndexClient
 
 
 def createSingletonComponent(cls):
@@ -100,6 +208,8 @@ def createSingletonComponent(cls):
     若你的组件没有标记为单例，调用此方法不会报错，并且可以通过 `getOneSingletonComponent` 等方法获得组件。
     但请注意，未标记 singleton=True 的组件无法被 @Query 注解查询。
     """
+    # TYPE_CHECKING: Python 2.7 typing workaround — enables IDE type inference.
+    # Replace with `if typing.TYPE_CHECKING` after Python 3 migration.
     if 1 > 2:
         return cls()
     entityId = singletonId()
@@ -123,10 +233,11 @@ def _handlePersistKeys(comp, entityId):
 
 
 def createComponent(entityId, cls):
+    # TYPE_CHECKING: Python 2.7 typing workaround
     if 1 > 2:
         return cls()
-    if not entityId:
-        raise ValueError('entityId is empty')
+    if not entityId or not isinstance(entityId, str) or len(entityId) == 0:
+        raise ValueError('entityId is invalid: %s' % repr(entityId))
     api = serverApi if isServer() else clientApi
     compKey = cls if type(cls) == str else cls.__name__
     comp = api.CreateComponent(entityId, COMPONENT_NAMESPACE, compKey)
@@ -139,7 +250,9 @@ def createComponent(entityId, cls):
     if hasattr(comp, 'onCreate'):
         comp.onCreate(entityId) # type: ignore
 
+    initComponentFields(comp, cls, entityId)
     _getEntityMarker().mark(entityId)
+    _getCompIndex().add(entityId, compKey)
     return comp
 
 
@@ -164,6 +277,7 @@ def destroyComponent(entityId, cls):
         del components[key]
         done = True
     _getEntityMarker().unmark(entityId)
+    _getCompIndex().remove(entityId, compKey)
     return done
 
 
@@ -172,15 +286,17 @@ def destrySingletonComponent(cls):
 
 
 def getOneComponent(entityId, cls):
-    comps = getComponent(entityId, [cls])
-    if comps and len(comps) > 0:
-        return comps[0]
+    # TYPE_CHECKING: Python 2.7 typing workaround
     if 1 > 2:
         return cls()
+    comps = getComponent(entityId, [cls])
+    if EMPTY_SLOT not in comps and len(comps) > 0:
+        return comps[0]
 
 
 def getOneSingletonComponent(cls):
     entityId = singletonId()
+    # TYPE_CHECKING: Python 2.7 typing workaround
     if 1 > 2:
         return cls()
     return getOneComponent(entityId, cls)
@@ -198,7 +314,7 @@ def _findNamedComp(entityId, name):
             return None
 
 def getComponent(entityId, clsList):
-    # type: (str, list[type|str]) -> list | None
+    # type: (str, list[type|str]) -> list
     result = []
     for c in iter(clsList):
         if c is None:
@@ -211,7 +327,7 @@ def getComponent(entityId, clsList):
         if comp:
             result.append(comp)
         else:
-            return None
+            result.append(EMPTY_SLOT)
     return result
 
 
@@ -219,16 +335,17 @@ def getComponentWithQuery(entityId, targets, required=[], excluded=[]):
     if len(required) + len(excluded) > 0:
         for shouldExclude in excluded:
             if hasComponent(entityId, shouldExclude):
-                return None
+                return None, shouldExclude
         for shouldRequire in required:
             if not hasComponent(entityId, shouldRequire):
-                return None
-        return getComponent(entityId, targets)
+                return None, shouldRequire
+        return getComponent(entityId, targets), None
     else:
-        return getComponent(entityId, targets)
+        return getComponent(entityId, targets), None
 
 
 def getOrCreateComponent(entityId, cls):
+    # TYPE_CHECKING: Python 2.7 typing workaround
     if 1 > 2:
         return cls()
     comp = getOneComponent(entityId, cls)
@@ -243,6 +360,9 @@ def getOrCreateSingletonComponent(cls):
     若你的组件没有标记为单例，调用此方法不会报错，并且可以正常获得组件。
     但请注意，未标记 singleton=True 的组件无法被 @Query 注解查询。
     """
+    # TYPE_CHECKING: Python 2.7 typing workaround
+    if 1 > 2:
+        return cls()
     entityId = singletonId()
     comp = getOneComponent(entityId, cls)
     if comp is None:

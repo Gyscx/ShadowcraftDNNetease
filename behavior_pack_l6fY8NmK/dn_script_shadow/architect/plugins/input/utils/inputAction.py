@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from ....core.log import warn as _log_warn
 from ..enum import ValueType, AccumulationBehavior
 from .modifier import InputModifier
 from .trigger import InputTrigger
@@ -14,7 +16,7 @@ class InputAction(object):
         self.triggers = triggers
 
         if name in InputAction._registry:
-            print('[WARN] InputAction: Action {} already registered'.format(name))
+            _log_warn('InputAction: Action {} already registered', name)
         InputAction._registry[name] = self
 
     @classmethod

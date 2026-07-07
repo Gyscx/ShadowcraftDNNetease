@@ -1,175 +1,351 @@
-# 组件系统
+# ECS — 实体组件系统
 
-`architect` 的组件系统基于网易 SDK 的 `RegisterComponent` / `CreateComponent` 机制，提供声明式组件定义、生命周期管理和查询支持。
+RoninNetease 实现了基于 CompIndex（组件反向索引）的 ECS 架构，将实体的数据和逻辑分离到可组合的组件中。
 
-## 组件基类
+---
 
-服务端和客户端各有对应的基类：
+## 1. 核心概念
+
+| 概念 | 说明 |
+|---|---|
+| **Entity** | 由引擎管理的游戏对象（实体 ID 为 `str`） |
+| **Component** | 附着在实体上的纯数据容器，无逻辑 |
+| **CompIndex** | 反向索引：每种组件类型维护 `{entityId: instance}` 字典 |
+| **System** | 继承自 `Subsystem` 的逻辑处理单元，通过 `@Query` 遍历实体 |
+
+---
+
+## 2. 定义组件
+
+### 2.1 基本组件
 
 ```python
-from architect.component import BaseCompServer, BaseCompClient
+from architect.component import Component
 
-# 服务端组件
-class MyServerComp(BaseCompServer):
-    def onCreate(self, entityId):
-        self.data = 0
+class Health(Component):
+    hp = 100
+    maxHp = 100
 
-    def onDestroy(self, entityId):
-        pass
-
-    def loadData(self, entityId):
-        pass
-
-# 客户端组件
-class MyClientComp(BaseCompClient):
-    def onCreate(self, entityId):
-        pass
-
-    def onDestroy(self, entityId):
-        pass
-
-    def loadData(self, entityId):
-        pass
+class Transform(Component):
+    x = 0.0
+    y = 0.0
+    z = 0.0
+    yaw = 0.0
+    pitch = 0.0
 ```
 
+`Component` 是所有自定义组件的基类。类属性会作为实例的默认值。
 
-## 组件创建与管理 API
+### 2.2 持久化组件 — `@PersistKeys`
+
+`@PersistKeys` 是一个**类装饰器**，接收需要持久化的字段名作为参数：
 
 ```python
-from architect.component.core import (
-    createComponent,
-    createComponents,
-    createSingletonComponent,
-    destroyComponent,
-    getOneComponent,
-    getOneSingletonComponent,
-    getOrCreateComponent,
-    getOrCreateSingletonComponent,
-    getComponent,
-    getComponentWithQuery,
-    getEntities,
-    hasComponent,
-    removeComponents,
-)
+from architect.component import Component, PersistKeys
 
-# 创建组件
-comp = createComponent(entityId, MyComponent)
-
-# 批量创建
-comps = createComponents(entityId, CompA, CompB)
-
-# 创建单例组件（绑定在 singletonId() 上）
-singleton = createSingletonComponent(MyComponent)
-
-# 获取组件的第一个实例
-comp = getOneComponent(entityId, MyComponent)
-
-# 获取单例组件
-comp = getOneSingletonComponent(MyComponent)
-
-# 获取或创建
-comp = getOrCreateComponent(entityId, MyComponent)
-
-# 获取/创建单例
-s = getOrCreateSingletonComponent(MyComponent)
-
-# 获取多个组件（仅当实体拥有所有指定组件时才返回列表，否则返回 None）
-result = getComponent(entityId, [CompA, CompB])
-# 返回 [CompA实例, CompB实例] 或 None
-
-# 带过滤条件的获取
-comp = getComponentWithQuery(entityId, targets=[CompA], required=[ReqComp], excluded=[ExcludeComp])
-
-# 检查实体是否拥有所有指定组件
-has = hasComponent(entityId, CompA, CompB)
-
-# 销毁组件
-destroyComponent(entityId, MyComponent)
-
-# 批量销毁
-removeComponents(entityId, CompA, CompB)
+@PersistKeys('slots', 'selected')
+class Inventory(Component):
+    slots = [''] * 36
+    selected = 0
 ```
 
-## 组件标记系统
+标记后，这些字段的值会在实体卸载/重载时自动保存和恢复。
 
-框架使用 `Marker` 类标记拥有组件的实体：
-
-```python
-from architect.component.core import entitiesServer, entitiesClient
-
-# 获取所有有组件的实体 ID
-entityIds = getEntities()
-```
-
-## 通过字符串名称获取组件
+### 2.3 带字段验证的组件 — `@DefineFields`
 
 ```python
-# 名称前加 '#' 前缀获取引擎原生组件
-comp = getOneComponent(entityId, '#Attr')
+from architect.component.schema import DefineFields, FieldSchema
 
-# 直接通过自定义组件名称字符串获取
-comp = getOneComponent(entityId, 'MyComponent')
-```
-
-## 持久化组件
-
-```python
-from architect.component.persistent import PersistKeys
-
-@Component(persist=True)
-@PersistKeys('score', 'level', isGlobal=False)
-class PlayerDataComponent(BaseCompServer):
+@DefineFields({
+    'level': FieldSchema(default=1,
+                         validator=lambda v: v >= 1),
+    'xp': FieldSchema(default=0,
+                      validator=lambda v: v >= 0),
+    'health': FieldSchema(default=100.0,
+                          validator=lambda v: 0.0 <= v <= 1000.0),
+    'name': FieldSchema(default='Unknown')
+})
+class PlayerStats(Component):
     pass
 ```
 
-持久化会自动将声明字段的 getter/setter 替换为数据库读写：
+`FieldSchema(default, validator)` 参数：
+- `default` — 字段的默认值
+- `validator` — 可选的验证函数，接收值返回 `bool`。验证失败时会打印警告。
+
+`@DefineFields` 声明的字段会在 `createComponent()` 时自动初始化到组件实例。
+
+---
+
+## 3. 创建、获取与销毁组件
+
+### 3.1 API 速查
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `createComponent` | `(entityId: str, cls: type) -> instance` | 创建并附着组件 |
+| `getOrCreateComponent` | `(entityId: str, cls: type) -> instance` | 获取已有或创建新组件 |
+| `getComponent` | `(entityId: str, cls: type) -> instance \| None` | 获取组件，不存在返回 None |
+| `hasComponent` | `(entityId: str, cls: type) -> bool` | 检查组件存在性 |
+| `destroyComponent` | `(entityId: str, cls: type) -> None` | 销毁组件 |
+| `removeComponents` | `(entityId: str) -> None` | 移除实体上的所有组件 |
+| `getEntities` | `(cls: type) -> set[str]` | 获取所有拥有该组件的实体 ID 集 |
+| `isPersistComponent` | `(cls: type) -> bool` | 检查组件是否声明了持久化 |
+
+### 3.2 示例
 
 ```python
-# isGlobal=False -> ClientKVDatabase
-# isGlobal=True  -> ClientKVDatabaseGlobal
+from architect.component import (
+    createComponent, getOrCreateComponent, getComponent,
+    hasComponent, destroyComponent, getEntities
+)
+
+# 创建
+health = createComponent('entity_abc', Health)
+
+# 获取或创建
+health = getOrCreateComponent('entity_abc', Health)
+health.hp = max(0, health.hp - 10)
+
+# 检查
+if not hasComponent('entity_abc', Armor):
+    createComponent('entity_abc', Armor)
+
+# 查询所有拥有 Health 组件的实体
+all_entities = getEntities(Health)  # {'entity_abc', 'entity_xyz', ...}
+
+# 销毁
+destroyComponent('entity_abc', Health)
 ```
 
-## 引擎原生组件快捷访问
+### 3.3 单例组件
 
-通过 `NeS`（服务端）和 `NeC`（客户端）访问引擎原生组件：
+某些组件每个实体只应该有一个实例（如 `EventReader`），框架提供了单例风格的 API：
 
 ```python
-from architect.component.common import NeS, NeC
+from architect.component import (
+    getOrCreateSingletonComponent,
+    destroySingletonComponent
+)
 
-# 通过 getOneComponent 获取原生组件
-attrComp = getOneComponent(playerId, '#Attr')  # 等价于 compServer.CreateAttr(playerId)
-posComp = getOneComponent(entityId, '#Pos')    # 等价于 compClient.CreatePos(entityId)
+# 获取或创建
+reader = getOrCreateSingletonComponent('EventReader')
+
+# 销毁
+destroySingletonComponent('EventReader')
 ```
 
-## 查询系统
+---
 
-`@Query` 注解配合调度注解使用，自动筛选实体并注入组件：
+## 4. 查询实体 — `@Query`
+
+### 4.1 基本用法
+
+`@Query` 接收组件类作为位置参数，按顺序注入到方法参数中。用 `EntityId` 伪组件获取实体 ID：
 
 ```python
-from architect.core.scheduler import Scheduler
-from architect.query import Query
+from architect.query import Query, EntityId
 
-class MySystem(ServerSubsystem):
-    @Sched.Tick()
-    @Query(EntityId, MyComponent)
-    def handle_logic(self, entityId, myComp):
-        pass
+class DamageSystem(ServerSubsystem):
+    canTick = True
 
-    @Query(MyComponent, required=[RequiredComp], excluded=[ExcludeComp])
-    def handle_filtered(self, myComp):
-        pass
+    @Query(Health, Transform, EntityId,
+           required=[PlayerStats],
+           excluded=[Dead])
+    def process(self, health, transform, entityId):
+        # health: Health 实例
+        # transform: Transform 实例
+        # entityId: 实体 ID (str)
+        # 注：required 中的 PlayerStats 仅用于筛选，不注入到参数
+        health.hp -= 1
+
+    def onUpdate(self, dt):
+        self.process()  # 遍历所有匹配实体
 ```
 
-### 内置伪组件
-
-- **`EntityId`**: 注入当前实体的 ID 字符串
-- **`ExtraArguments`**: 调用时的位置参数列表
-- **`ExtraArgDict`**: 调用时的关键字参数字典
-
-### 查询缓存
+### 4.2 `@Query` 参数详解
 
 ```python
-from architect.query.queryServer import QueryServer
+def Query(*compCls, **options):
+```
 
-# 缓存组件查询（减少重复创建开销）
-pos = QueryServer.cache('pos', entityId, lambda: getOneComponent(entityId, '#Pos'))
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `*compCls` | 位置参数 | 组件类型列表，按顺序注入到被装饰方法的参数中 |
+| `required` | `list` | 必须额外存在的组件（不注入到参数中） |
+| `excluded` | `list` | 必须排除的组件 |
+
+### 4.3 伪组件
+
+| 伪组件 | 注入值 |
+|---|---|
+| `EntityId` | 实体 ID 字符串 |
+| `ExtraArguments` | 调用 wrapper 时传入的 `*args` |
+| `ExtraArgDict` | 调用 wrapper 时传入的 `**kwargs` |
+
+伪组件可以放在参数列表的任意位置，框架自动替换对应的值。
+
+### 4.4 查询装饰器内部机制
+
+`@Query` 装饰器修改被装饰方法的行为：
+- 不带参数调用时 → 遍历所有匹配实体，注入参数后逐次调用
+- 带参数调用时 → 传入的参数作为 `*args` 和 `**kwargs`（可通过 `ExtraArguments`/`ExtraArgDict` 获取）
+
+```python
+# 处理所有匹配实体
+self.process()
+
+# 带额外参数（需要 ExtraArgDict 伪组件接收）
+self.process(some_flag=True)
+```
+
+---
+
+## 5. CompIndex 缓存
+
+框架维护组件类型的反向索引。当组件被创建或销毁时，索引自动更新：
+
+```
+CompIndex
+├── Health   → {'e1': <Health hp=90>, 'e2': <Health hp=50>, 'e3': <Health hp=80>}
+├── Transform → {'e1': <Transform ...>, 'e2': <Transform ...>}
+├── PlayerStats → {'e1': <PlayerStats level=3>, 'e3': <PlayerStats level=1>}
+└── ...
+```
+
+查询 `(Health, Transform, EntityId)` 时：
+1. 取 `Health` 实体集 ∩ `Transform` 实体集
+2. 遍历结果，注入对应组件实例
+
+---
+
+## 6. Marker — 实体标记组件
+
+`Marker` 是一个特殊的生命周期标记组件，用于追踪实体的创建和销毁。每次 `createComponent()` 自动执行 `mark()`，`destroyComponent()` 自动执行 `unmark()`：
+
+```python
+from architect.component import createComponent, destroyComponent
+
+# 创建 Marker（自动追踪实体创建）
+marker = createComponent(entityId, Marker)
+
+# 销毁 Marker（自动追踪实体销毁）
+destroyComponent(entityId, Marker)
+```
+
+从 v1.1.0 开始，`Marker` 暴露了两个 `EventSignal` 用于监听实体生命周期：
+
+```python
+from architect.component import entitiesServer  # 服务端
+from architect.component import entitiesClient  # 客户端
+
+# 实体首次标记时
+entitiesServer.onEntityCreated.on(lambda entityId: print('Created:', entityId))
+
+# 实体最终取消标记时
+entitiesServer.onEntityDestroyed.on(lambda entityId: print('Destroyed:', entityId))
+```
+
+---
+
+## 7. 原生组件访问
+
+框架提供了对网易引擎原生组件的简化访问：
+
+```python
+from architect.component import NeC, NeS
+
+# 获取引擎原生组件
+player_comp = NeC.Player          # '#Player'（客户端原生组件）
+item_comp = NeS.Item              # '#Item'（服务端原生组件）
+```
+
+`NeC` 和 `NeS` 是常量类，列出了约 50 个常用的客户端和 40 个常用的服务端原生组件名称。
+
+---
+
+## 8. 完整示例：战斗系统
+
+```python
+# components/combat.py
+from architect.component import Component, PersistKeys
+from architect.component.schema import DefineFields, FieldSchema
+
+class Health(Component):
+    hp = 100
+    maxHp = 100
+
+@DefineFields({
+    'attack': FieldSchema(default=10, validator=lambda v: v >= 0),
+    'defense': FieldSchema(default=5, validator=lambda v: v >= 0),
+})
+class CombatStats(Component):
+    pass
+
+class Dead(Component):
+    """标记死尸组件"""
+    pass
+
+# subsystems/combatSystem.py
+from architect.core import SubsystemServer, ServerSubsystem, EventListener
+from architect.query import Query, EntityId
+from architect.component import createComponent, getComponent
+
+class ServerCombatSystem(ServerSubsystem):
+    canTick = True
+
+    @EventListener('EntityHurtEvent')
+    def onEntityHurt(self, event):
+        sourceId = event.srcId
+        targetId = event.id
+        rawDamage = event.damage
+
+        # 获取攻击方属性
+        attacker = getComponent(sourceId, CombatStats)
+        atk = attacker.attack if attacker else 5
+
+        # 获取防御方属性
+        defender = getComponent(targetId, CombatStats)
+        defense = defender.defense if defender else 0
+
+        # 计算最终伤害
+        finalDamage = max(1, atk - defense)
+
+        # 应用伤害
+        health = getComponent(targetId, Health)
+        if health:
+            health.hp = max(0, health.hp - finalDamage)
+            event.setEvent('damage', finalDamage)
+
+            if health.hp <= 0:
+                self.handle_death(targetId)
+
+    def handleDeath(self, entityId):
+        createComponent(entityId, Dead)
+```
+
+```python
+# subsystems/combat_client.py
+from architect.core import SubsystemClient, ClientSubsystem
+from architect.query import Query, EntityId
+
+class ClientCombatSystem(ClientSubsystem):
+    canTick = True
+
+    @Query(Health, EntityId, excluded=[Dead])
+    def updateHealthBars(self, health, entityId):
+        # 只处理活着的实体
+        hpPct = health.hp / max(1, health.maxHp)
+        self.show_health_bar(entityId, min(1.0, hpPct))
+
+    def onUpdate(self, dt):
+        self.update_health_bars()
+```
+
+---
+
+## 下一步
+
+- [事件系统 (event.md)](event.md) — 事件 API 详解
+- [子系统 (subsystem.md)](subsystem.md) — 子系统 API
+- [最佳实践 (best-practices.md)](best-practices.md) — 组件设计建议

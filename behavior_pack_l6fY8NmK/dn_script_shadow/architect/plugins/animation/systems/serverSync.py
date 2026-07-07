@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import time
 
 from ....compact import remote, Remote, ServerSubsystem, SubsystemServer
@@ -20,10 +21,10 @@ class AnimExServer(ServerSubsystem):
         )
 
     @Remote
-    def _syncPlay(self, actorId, animKey, layer='default', replay=False, playRate=1, startTime=time.time()):
+    def _syncPlay(self, actorId, animKey, layer='default', replay=False, playRate=1, startTime=time.time(), noBlending=False):
         remote.server.callEvery(
             FnNamePlayFromServer,
-            actorId, animKey, layer, replay, playRate, startTime, True
+            actorId, animKey, layer, replay, playRate, startTime, True, noBlending
         )
 
     @Remote

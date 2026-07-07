@@ -100,8 +100,7 @@ class ShadowScreenUI(ScreenNode):
         def handler(args):
             if args["TouchEvent"] == touchEventEnum.TouchUp:
                 if client_sys.CheckItemForSkill(client_sys.GetSkillConfig(skill_id)):
-                    if client_sys.TriggerSkillAbility(skill_id):
-                        self.StartCooldown(skill_id)
+                    client_sys.TriggerSkillAbility(skill_id)
 
         return handler
 
@@ -128,6 +127,16 @@ class ShadowScreenUI(ScreenNode):
         # 更新所有技能按钮状态
         self.UpdateAllSkillButtons()
         self.UpdateAbilityVisibility()
+        
+        # 初始化时隐藏所有cooldownImg
+        for skill in config.SKILL_CONFIGS:
+            button_path = skill.get("ui_button_path")
+            if button_path:
+                cooldown_img_path = button_path + "/cooldownImg"
+                cooldown_img_ctrl = self.GetBaseUIControl(cooldown_img_path)
+                if cooldown_img_ctrl:
+                    cooldown_img_ctrl.SetVisible(False)
+        
         self.UpdateScreen()  # 触发数据绑定刷新
 
     def _get_skill_texture_name(self, skill_cfg):
@@ -181,9 +190,12 @@ class ShadowScreenUI(ScreenNode):
         # 2. 获取该技能的默认纹理基础名称（从valid_items的第一个物品中获取）
         default_texture_for_skill = self._get_skill_texture_name(skill_cfg)  # 例如: "eruption"
 
+        # 检查能量是否足够
+        has_enough_energy = self.shadowData >= 20
+
         # 3. 确定最终使用的纹理基础名称和状态
         texture_base = default_texture_for_skill  # 默认使用技能配置中的第一个纹理
-        if has_item and client_sys:
+        if has_item and client_sys and has_enough_energy:
             # 有物品时，尝试获取当前实际匹配的物品配置
             matched_config = client_sys.GetMatchedItemConfig(skill_id)
             if matched_config:
@@ -191,15 +203,18 @@ class ShadowScreenUI(ScreenNode):
                 texture_base = matched_config.get("texture_name", default_texture_for_skill)
             # 如果 has_item 为 True 但 matched_config 为 None，仍使用默认纹理，但状态应为“就绪”
 
-        # 4. 关键修复：根据 has_item 决定贴图后缀，直接而明确
-        if has_item:
-            # 有有效物品 -> 使用“就绪”状态贴图 (_button)
+        # 4. 关键修复：根据 has_item 和能量决定贴图后缀，直接而明确
+        if has_item and has_enough_energy:
+            # 有有效物品且能量足够 -> 使用"就绪"状态贴图 (_button)
             final_texture_path = "textures/ui/%s_button" % texture_base
             skill_state_for_logic = config.SKILL_STATE["READY"]
         else:
-            # 无有效物品 -> 使用“锁定”状态贴图 (_button_locked)
+            # 无物品或能量不足 -> 使用"锁定"状态贴图 (_button_locked)
             final_texture_path = "textures/ui/%s_button_locked" % texture_base
-            skill_state_for_logic = config.SKILL_STATE["NO_ITEM"]
+            if not has_item:
+                skill_state_for_logic = config.SKILL_STATE["NO_ITEM"]
+            else:
+                skill_state_for_logic = config.SKILL_STATE["NO_ENERGY"]
 
         # 5. 获取UI按钮控件
         button_path = skill_cfg.get("ui_button_path")
@@ -213,9 +228,31 @@ class ShadowScreenUI(ScreenNode):
             image_control.asImage().SetSprite(final_texture_path)
         self.UpdateScreen()
 
+        # 6.5 更新按键标签显示（仅在非冷却状态下显示）
+        time_text_path = skill_cfg.get("ui_button_path") + "/button_label"
+        time_text_ctrl = self.GetBaseUIControl(time_text_path)
+        if time_text_ctrl:
+            label = time_text_ctrl.asLabel()
+            # 检查是否处于冷却状态
+            is_on_cooldown = self.skill_states.get(skill_id, {}).get("cooldown_time", 0) > 0
+            
+            if has_item and not is_on_cooldown:
+                # 有物品且不在冷却中，显示按键标签
+                if clientApi.GetPlatform() == 0:  # PC端
+                    label.SetText(skill_cfg.get("pc_key_label", ""))
+                    label.SetVisible(True)
+                    # logger.info("显示按键标签：%s" % skill_cfg.get("pc_key_label", ""))
+                else:
+                    label.SetText("")
+                    label.SetVisible(False)
+            else:
+                # 无物品或在冷却中，清空文本
+                label.SetText("")
+                label.SetVisible(False)
+
         # 7. 更新按钮可点击状态和内部状态存储
-        # 按钮可点击性直接与是否有有效物品挂钩
-        button_control.SetTouchEnable(has_item)
+        # 按钮可点击性直接与是否有有效物品和能量是否足够挂钩
+        button_control.SetTouchEnable(has_item and has_enough_energy)
 
         # 更新内部状态字典
         if skill_id in self.skill_states:
@@ -235,43 +272,51 @@ class ShadowScreenUI(ScreenNode):
         if skill_cfg:
             # 使用传入的冷却时间，或使用配置中的默认值
             duration = cooldown_duration if cooldown_duration is not None else skill_cfg["cooldown"]
+            logger.info("开始技能冷却111：%s，冷却时间：%s秒" % (skill_cfg.get("pc_key_label", ""), duration))
             self.skill_states[skill_id]["cooldown_time"] = duration
+            logger.info("开始技能冷却222：%s，冷却时间：%s秒" % (skill_cfg.get("pc_key_label", ""), duration))
+            
+            # 获取技能按钮路径
+            button_path = skill_cfg.get("ui_button_path")
+            if button_path:
+                # 获取cooldownImg控件
+                cooldown_img_path = button_path + "/cooldownImg"
+                cooldown_img_ctrl = self.GetBaseUIControl(cooldown_img_path)
+                
+                if cooldown_img_ctrl:
+                    # 获取对应的locked贴图
+                    texture_name = self._get_skill_texture_name(skill_cfg)
+                    locked_texture = "textures/ui/%s_button_locked" % texture_name
+                    
+                    # 显示cooldownImg并设置贴图
+                    cooldown_img_ctrl.SetVisible(True)
+                    cooldown_img_ctrl.asImage().SetSprite(locked_texture)
+                    
+                    cooldown_img_ctrl.RemoveAnimation("clip")
+                    
+                    data = {
+                        "namespace": "ShadowAnimations",
+                        "clip_animation": {
+                            "anim_type": "clip",
+                            "duration": float(duration),
+                            "from": 0.0,
+                            "to": 1.0
+                        }
+                    }
+                    clientApi.RegisterUIAnimations(data, True)
+                    cooldown_img_ctrl.SetAnimation("clip", "ShadowAnimations", "clip_animation", True)
+                    cooldown_img_ctrl.PlayAnimation("clip")
+                    logger.info("开始技能冷却333：%s，冷却时间：%s秒" % (skill_cfg.get("pc_key_label", ""), duration))
+                    
+                    # 隐藏按键标签
+                    time_text_path = button_path + "/button_label"
+                    time_text_ctrl = self.GetBaseUIControl(time_text_path)
+                    if time_text_ctrl:
+                        time_text_ctrl.asLabel().SetText("")
+                        time_text_ctrl.asLabel().SetVisible(False)
+
             # 直接调用UpdateSkillButtonState，传入has_item=True，因为能释放技能肯定持有物品
             self.UpdateSkillButtonState(skill_id, True)
-
-    def UpdateCooldowns(self):
-        """更新所有技能的冷却显示"""
-        for skill_id, state in self.skill_states.items():
-            time_left = state["cooldown_time"]
-            skill_config = None
-            for cfg in config.SKILL_CONFIGS:
-                if cfg["skill_id"] == skill_id:
-                    skill_config = cfg
-                    break
-            if not skill_config:
-                continue
-            time_text_path = skill_config["ui_button_path"] + "/button_label"
-            time_text_ctrl = self.GetBaseUIControl(time_text_path)
-            if not time_text_ctrl:
-                continue
-            label = time_text_ctrl.asLabel()
-            if time_left > 0:
-                # +++ 修复点1：冷却中，始终显示时间
-                label.SetText(str(round(time_left, 1)))
-                label.SetVisible(True)
-            else:
-                # +++ 修复点2：冷却结束，根据是否有物品来决定显示内容
-                if state.get("has_item", False):
-                    # 有物品，显示按键标签
-                    if clientApi.GetPlatform() == 0:  # PC端
-                        label.SetText(skill_config.get("pc_key_label", ""))
-                    else:
-                        label.SetText("")
-                        label.SetVisible(False)
-                else:
-                    # 无物品，清空文本
-                    label.SetText("")
-                    label.SetVisible(False)
 
     def UpdateShadow(self, new_value, effect=None):
         """更新暗影能量显示
@@ -292,6 +337,8 @@ class ShadowScreenUI(ScreenNode):
             self.shadowData = 100
             self.ability_visible = True
             print "[Debug] 暗影充能效果：能量条为满"
+            # 充能状态下更新所有技能按钮为可用状态
+            self.UpdateAllSkillButtons()
         else:
             # 正常状态
             if new_value < 0.0:
@@ -301,11 +348,17 @@ class ShadowScreenUI(ScreenNode):
             energy = max(0, min(energy, 100))
             self.shadowData = energy
 
-            if old_energy < 100 and energy >= 100:
-                notify_comp.SetLeftCornerNotify("暗影能量条已填充完毕，可以释放技能")
-                logger.info("UI: 暗影能量满，发送通知")
+            if old_energy < 20 and energy >= 20:
+                # notify_comp.SetLeftCornerNotify("暗影能量已足够，可以释放技能")
+                logger.info("UI: 暗影能量已足够，发送通知")
+                # 能量从不足变为足够，更新所有技能按钮状态
+                self.UpdateAllSkillButtons()
+            elif old_energy >= 20 and energy < 20:
+                logger.info("UI: 暗影能量不足，锁定所有技能按钮")
+                # 能量从足够变为不足，更新所有技能按钮状态为锁定
+                self.UpdateAllSkillButtons()
 
-            if energy >= 100:
+            if energy >= 20:
                 self.ability_visible = True
             elif energy <= 0:
                 self.ability_visible = False
@@ -324,6 +377,7 @@ class ShadowScreenUI(ScreenNode):
         current_data = config_comp.GetConfigData("dn_shadow_energy")
         if current_data:
             current_data["is_full"] = self.ability_visible
+            current_data["ability_visible"] = self.ability_visible
             config_comp.SetConfigData("dn_shadow_energy", current_data)
 
     def ConsumeShadowForAbility(self, amount):
@@ -425,7 +479,7 @@ class ShadowScreenUI(ScreenNode):
             # 可以在这里立即处理UI反馈
             if success:
                 # 升级请求已发送，等待服务端返回结果
-                pass
+                self.OnUpgradeResult(self.current_upgrade_skill, success)
             else:
                 # 客户端检查失败（如碎片不足）
                 notify_comp.SetLeftCornerNotify("升级条件不满足")
@@ -515,23 +569,14 @@ class ShadowScreenUI(ScreenNode):
         if success:
             # 升级成功，播放特效
             self.PlayUpgradeEffect(skill_id)
-            # 确保这里没有类似下面的通知代码：
-            # notify_comp.SetLeftCornerNotify("升级成功！")  # 此类代码应删除
-        # else:  # 失败提示应由客户端系统统一处理，这里也不应重复提示
-        #     pass
 
     def PlayUpgradeEffect(self, skill_id):
         """播放升级特效"""
         # 可以添加粒子效果、声音等
         player_id = clientApi.GetLocalPlayerId()
-
-        # 示例：播放升级粒子效果
-        particle_comp = CCF.CreateParticle(player_id)
-        # 这里需要根据实际情况调整粒子效果
-
-        # 播放升级音效
-        audio_comp = CCF.CreateAudio(player_id)
-        audio_comp.PlayUI("random.levelup", 1.0, 1.0)
+        sound_comp = CCF.CreateCustomAudio(player_id)
+        result = sound_comp.PlayCustomMusic("random.levelup", (1,1,1), 1, 1, False, player_id)
+        logger.info("播放升级音效结果: %s", result)
 
     def __getattr__(self, name):
         """动态处理技能纹理和冷却时间的获取"""

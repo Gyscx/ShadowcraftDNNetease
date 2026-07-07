@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 
 import mod.server.extraServerApi as serverApi
+import random
 from mod_log import logger
 from .. import config
 
 from ..architect.compact import ServerSubsystem, SubsystemServer
 from ..architect.compact import EventListener, CustomEvent
+from ..architect.fsm.stateTree.common import StateTree, StateNode
 
 SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
 levelId = serverApi.GetLevelId()
 
+energy_shadow = 8
 
 @SubsystemServer
 class ShadowServerSystem(ServerSubsystem):
@@ -26,26 +29,83 @@ class ShadowServerSystem(ServerSubsystem):
         self.entity_identifiers = {}  # entity_id -> identifier
         # 存储实体粒子效果定时器
         self.entity_particle_timers = {}  # entity_id -> timer_id
-        # 存储玩家粒子效果定时器
-        self.player_particle_timers = {}  # player_id -> timer_id
-        # 存储玩家能量递减定时器
-        self.player_energy_decay_timers = {}  # player_id -> timer_id
-        # 防止定时器回调重入的标志
-        self.player_particle_timer_running = {}  # player_id -> bool
-        self.player_energy_decay_timer_running = {}  # player_id -> bool
-        # 防止定时器回调重入的标志
-        self.player_particle_timer_running = {}  # player_id -> bool
-        self.player_energy_decay_timer_running = {}  # player_id -> bool
-        # 防止定时器回调重入的标志
-        self.player_particle_timer_running = {}  # player_id -> bool
-        self.player_energy_decay_timer_running = {}  # player_id -> bool
+        # 存储玩家暗影抑制状态（玩家ID -> 抑制结束时间戳）
+        self.player_suppression_timers = {}  # player_id -> end_timestamp
         # 存储玩家效果剩余时间
         self.player_effect_durations = {}  # player_id -> {"suppression": int, "charging": int}
         # 存储实体效果剩余时间
         self.entity_effect_durations = {}  # entity_id -> {"suppression": int, "charging": int}
         # 存储玩家技能伤害乘数（用于传递给抛射物相关技能）
         self.player_skill_damage_multipliers = {}  # player_id -> damage_multiplier
+        # 怪物攻击状态树：entity_id -> StateTree
+        self.monster_attack_trees = {}  # entity_id -> StateTree
     
+    # ========== 怪物攻击状态树节点 ==========
+    class MonsterIdleNode(StateNode):
+        def __init__(self):
+            StateNode.__init__(self, 'idle')
+
+        def update(self, tree):
+            pass
+
+    class MonsterPrepareNode(StateNode):
+        def __init__(self):
+            StateNode.__init__(self, 'prepare')
+
+        def enter(self, previous, tree):
+            server = tree.mapping.get('server')
+            skill_id = tree.mapping.get('skill_id')
+            if server:
+                server._playMonsterPrepareEffect(tree.entityId, skill_id)
+
+        def update(self, tree):
+            if tree.stateTicks >= 20:
+                tree.finishTasks()
+
+    class MonsterAttackNode(StateNode):
+        def __init__(self):
+            StateNode.__init__(self, 'attack')
+
+        def enter(self, previous, tree):
+            server = tree.mapping.get('server')
+            skill_id = tree.mapping.get('skill_id')
+            target_id = tree.mapping.get('target_id')
+            if server:
+                server.ExecuteMonsterSkill(tree.entityId, target_id, skill_id)
+
+        def update(self, tree):
+            if tree.stateTicks >= 40:
+                tree.finishTasks()
+
+    def _getOrCreateMonsterAttackTree(self, monster_id):
+        if monster_id not in self.monster_attack_trees:
+            tree = StateTree(monster_id)
+            combat = StateNode('combat')
+            idle = self.MonsterIdleNode()
+            prepare = self.MonsterPrepareNode()
+            attack = self.MonsterAttackNode()
+            combat.addChildren(idle, prepare, attack)
+            tree.insertNode(combat)
+            tree.mapping['server'] = self
+            tree.mapping['skill_id'] = None
+            tree.mapping['target_id'] = None
+            tree.switchNode(idle)
+            self.monster_attack_trees[monster_id] = tree
+        return self.monster_attack_trees[monster_id]
+
+    def _playMonsterPrepareEffect(self, monster_id, skill_id):
+        try:
+            cmd_comp = SCF.CreateCommand(levelId)
+            pos_comp = SCF.CreatePos(monster_id)
+            
+            particle_cmd = "/particle sf:shadow_smoke ~~~"
+            cmd_comp.SetCommand(particle_cmd, monster_id)
+            sound_cmd = "/playsound shadow.ability.windmill @a[r=10]"
+            cmd_comp.SetCommand(sound_cmd, monster_id)
+            logger.info("怪物 %s 前摇蓄力中，技能: %s" % (monster_id, skill_id))
+        except Exception as e:
+            logger.error("_playMonsterPrepareEffect error: %s" % str(e))
+
     def _removeEffectAndNotify(self, entity_id, effect_name):
         """
         移除玩家身上的药剂效果并通知客户端
@@ -133,6 +193,18 @@ class ShadowServerSystem(ServerSubsystem):
         })
         logger.info("玩家 %s 应用暗影充能效果" % player_id)
 
+        # 设置玩家能量值为100
+        if not hasattr(self, 'player_energy_values'):
+            self.player_energy_values = {}
+        self.player_energy_values[player_id_str] = 100
+        logger.info("[充能效果] 设置玩家 %s 能量值为100" % player_id)
+
+        # 同步能量值100给客户端配置，确保客户端和服务端能量值一致
+        self.sendClient(player_id, config.SetPlayerShadowEnergyEvent, {
+            "energy_value": 100
+        })
+        logger.info("[充能效果] 同步玩家 %s 能量值100给客户端配置" % player_id)
+
     def removePlayerShadowEffect(self, player_id):
         """移除玩家特殊效果，恢复正常状态"""
         player_id_str = str(player_id)
@@ -142,14 +214,27 @@ class ShadowServerSystem(ServerSubsystem):
             return
         if player_id_str in self.player_shadow_effects:
             del self.player_shadow_effects[player_id_str]
-        # 恢复正常状态（默认空能量条）
+
+        # 获取玩家当前实际能量值，恢复为正常显示
+        if not hasattr(self, 'player_energy_values'):
+            self.player_energy_values = {}
+        current_energy = self.player_energy_values.get(player_id_str, 0)
+        clip_ratio = 1.0 - (current_energy / 100.0)
+
+        # 恢复正常状态（使用实际能量值）
         self.sendClient(player_id, config.PlayerShadowEffectEvent, {
-            "clip_ratio": 1.0,
-            "shadow_data": 0,
-            "is_full": False,
+            "clip_ratio": clip_ratio,
+            "shadow_data": current_energy,
+            "is_full": (current_energy >= 100),
             "effect": None
         })
-        logger.info("玩家 %s 移除特殊效果" % player_id)
+        logger.info("玩家 %s 移除特殊效果，恢复能量显示为 %s" % (player_id, current_energy))
+
+        # 同步实际能量值给客户端配置
+        self.sendClient(player_id, config.SetPlayerShadowEnergyEvent, {
+            "energy_value": current_energy
+        })
+        logger.info("玩家 %s 同步实际能量值 %s 给客户端配置" % (player_id, current_energy))
 
     def broadcastEntityShadowUpdate(self, entity_id, data):
         """向所有玩家广播实体暗影能量更新"""
@@ -355,6 +440,16 @@ class ShadowServerSystem(ServerSubsystem):
                 logger.warning("shadowSystemPlayer: 玩家 %s 不在线" % player_id)
                 return False if operation != "query" else 0
 
+            # 检查玩家是否处于暗影抑制状态（直接检查效果状态，不依赖时间戳）
+            if self.player_shadow_effects.get(player_id_str) == "suppression":
+                # 玩家处于抑制状态，阻止能量增加
+                if operation == "add":
+                    logger.info("玩家 %s 处于暗影抑制状态，无法增加能量" % player_id)
+                    return False
+                elif operation == "set" and value > 0:
+                    logger.info("玩家 %s 处于暗影抑制状态，无法设置能量为 %s" % (player_id, value))
+                    return False
+
             # 获取当前能量值（从配置或默认值）
             # 注意：玩家能量值存储在客户端，服务端需要通过事件查询
             # 这里使用一个简化的方式：通过发送查询事件获取当前值
@@ -381,9 +476,6 @@ class ShadowServerSystem(ServerSubsystem):
                 })
                 logger.info("玩家 %s 的暗影能量设置为 %s" % (player_id, value))
                 
-                # 检查能量值是否为100，启动或停止粒子效果
-                self.checkPlayerBerserkMode(player_id, value)
-                
                 return True
 
             elif operation == "add":
@@ -398,9 +490,6 @@ class ShadowServerSystem(ServerSubsystem):
                     "amount": value,
                     "entityId": None
                 })
-                
-                # 检查暗影形态
-                self.checkPlayerBerserkMode(player_id, new_energy)
                 
                 return True
             elif operation == "reduce":
@@ -420,20 +509,10 @@ class ShadowServerSystem(ServerSubsystem):
                 # 更新服务端副本
                 self.player_energy_values[player_id_str] = new_energy
                 
-                # 如果新能量为0，直接同步状态（不发送递减事件，避免客户端出现负数）
-                if new_energy <= 0:
-                    self.sendClient(player_id, config.SetPlayerShadowEnergyEvent, {
-                        "energy_value": 0
-                    })
-                else:
-                    # 发送减少事件
-                    self.sendClient(player_id, config.AddShadowEnergyEvent, {
-                        "amount": -value,
-                        "entityId": None
-                    })
-                
-                # 检查暗影形态
-                # self.checkPlayerBerserkMode(player_id, new_energy)
+                # 直接同步完整能量值给客户端（避免增量导致的状态不一致）
+                self.sendClient(player_id, config.SetPlayerShadowEnergyEvent, {
+                    "energy_value": new_energy
+                })
                 
                 logger.info("玩家 %s 的暗影能量减少 %s" % (player_id, value))
                 return True
@@ -445,310 +524,6 @@ class ShadowServerSystem(ServerSubsystem):
         except Exception as e:
             logger.error("shadowSystemPlayer error: %s" % str(e))
             return False if operation != "query" else 0
-
-    def checkPlayerBerserkMode(self, player_id, energy_value):
-        """检查并更新玩家暗影形态状态"""
-        try:
-            player_id_str = str(player_id)
-            
-            # 检测玩家是否有暗影形态tag
-            has_berserk_tag = False
-            try:
-                tag_comp = SCF.CreateTag(player_id)
-                has_berserk_tag = tag_comp.EntityHasTag("shadow_berserk")
-            except Exception as e:
-                logger.warning("Tag API调用失败，使用字典后备方案: %s" % str(e))
-                has_berserk_tag = self.player_shadow_effects.get(player_id_str) == "berserk"
-            
-            if energy_value == 100 and not has_berserk_tag:
-                # 能量值=100且没有暗影形态tag，激活暗影形态
-                logger.info("玩家 %s 能量值已满，激活暗影形态！" % player_id_str)
-                
-                # 同步能量值给客户端
-                self.sendClient(player_id, config.SetPlayerShadowEnergyEvent, {
-                    "energy_value": 100
-                })
-                
-                # 给予tag
-                cmd_comp = SCF.CreateCommand(levelId)
-                add_tag_command = "/tag @s add shadow_berserk"
-                cmd_comp.SetCommand(add_tag_command, player_id_str)
-                print("已给予玩家 %s shadow_berserk tag" % player_id_str)
-                # 记录到字典作为后备
-                self.player_shadow_effects[player_id_str] = "berserk"
-                # 给予暗影形态效果
-                self.givePlayerEffects(player_id_str)
-                # 启动粒子效果定时器
-                self.startPlayerParticleTimer(player_id_str)
-                
-                # 启动能量递减定时器
-                self.startPlayerEnergyDecayTimer(player_id_str)
-            
-            elif energy_value == 0 and has_berserk_tag:
-                # 能量值=0且有暗影形态tag，移除暗影形态
-                logger.info("玩家 %s 能量值为0，移除暗影形态！" % player_id_str)
-                # 移除tag
-                cmd_comp = SCF.CreateCommand(levelId)
-                remove_tag_command = "/tag @s remove shadow_berserk"
-                cmd_comp.SetCommand(remove_tag_command, player_id_str)
-                logger.info("已移除玩家 %s 的 shadow_berserk tag" % player_id_str)
-                # 清除所有暗影形态效果
-                self.clearPlayerEffects(player_id_str)
-                # 清除字典记录
-                if player_id_str in self.player_shadow_effects:
-                    del self.player_shadow_effects[player_id_str]
-                # 停止粒子效果定时器
-                self.stopPlayerParticleTimer(player_id_str)
-                # 停止能量递减定时器
-                self.stopPlayerEnergyDecayTimer(player_id_str)
-            
-        except Exception as e:
-            logger.error("checkPlayerBerserkMode error: %s" % str(e))
-
-    def givePlayerEffects(self, player_id_str):
-        """给予玩家暗影形态效果（速度 III、力量 III、夜视）"""
-        try:
-            cmd_comp = SCF.CreateCommand(levelId)
-            # 给予速度 III 效果
-            speed_command = "/effect @s speed 60 2 false"
-            cmd_comp.SetCommand(speed_command, player_id_str)
-            logger.info("已给予玩家 %s 速度 III 效果" % player_id_str)
-            # 给予力量 III 效果
-            strength_command = "/effect @s strength 60 2 false"
-            cmd_comp.SetCommand(strength_command, player_id_str)
-            logger.info("已给予玩家 %s 力量 III 效果" % player_id_str)
-            # 给予夜视效果
-            night_vision_command = "/effect @s night_vision 60 0 false"
-            cmd_comp.SetCommand(night_vision_command, player_id_str)
-            logger.info("已给予玩家 %s 夜视效果" % player_id_str)
-        except Exception as e:
-            logger.error("givePlayerEffects error: %s" % str(e))
-
-    def clearPlayerEffects(self, player_id_str):
-        """清除玩家的所有暗影形态效果（速度 III、力量 III、夜视）"""
-        try:
-            cmd_comp = SCF.CreateCommand(levelId)
-            remove_speed_command = "/effect @s speed 0 0 true"
-            cmd_comp.SetCommand(remove_speed_command, player_id_str)
-            logger.info("已移除玩家 %s 的速度 III 效果" % player_id_str)
-            # 移除力量效果
-            remove_strength_command = "/effect @s strength 0 0 true"
-            cmd_comp.SetCommand(remove_strength_command, player_id_str)
-            logger.info("已移除玩家 %s 的力量 III 效果" % player_id_str)
-            # 移除夜视效果
-            remove_night_vision_command = "/effect @s night_vision 0 0 true"
-            cmd_comp.SetCommand(remove_night_vision_command, player_id_str)
-            logger.info("已移除玩家 %s 的夜视效果" % player_id_str)
-        except Exception as e:
-            logger.error("clearPlayerEffects error: %s" % str(e))
-
-    def startPlayerParticleTimer(self, player_id_str):
-        """启动玩家粒子效果定时器"""
-        try:
-            # 如果已有定时器，先停止
-            if player_id_str in self.player_particle_timers:
-                self.stopPlayerParticleTimer(player_id_str)
-            
-            # 播放一次粒子
-            self.playPlayerParticle(player_id_str)
-            
-            # 创建循环定时器，每1秒播放一次粒子
-            time_comp = SCF.CreateGame(levelId)
-            timer_id = time_comp.AddTimer(1.0, lambda pid=player_id_str: self._playerParticleTimerCallback(pid))
-            self.player_particle_timers[player_id_str] = timer_id
-            
-            logger.info("玩家 %s 粒子效果定时器已启动" % player_id_str)
-            
-        except Exception as e:
-            logger.error("startPlayerParticleTimer error: %s" % str(e))
-
-    def stopPlayerParticleTimer(self, player_id_str):
-        """停止玩家粒子效果定时器"""
-        try:
-            if player_id_str in self.player_particle_timers:
-                timer_id = self.player_particle_timers[player_id_str]
-                # 真正取消定时器
-                time_comp = SCF.CreateGame(levelId)
-                time_comp.CancelTimer(timer_id)
-                # 移除定时器记录
-                del self.player_particle_timers[player_id_str]
-                logger.info("玩家 %s 粒子效果定时器已停止" % player_id_str)
-            else:
-                logger.info("玩家 %s 没有活跃的粒子定时器，无需停止" % player_id_str)
-            
-        except Exception as e:
-            logger.error("stopPlayerParticleTimer error: %s" % str(e))
-
-    def _playerParticleTimerCallback(self, player_id_str):
-        """玩家粒子定时器回调函数"""
-        try:
-            # 防止重入：如果已经在运行，直接返回
-            if self.player_particle_timer_running.get(player_id_str, False):
-                logger.warning("[粒子回调] 玩家 %s 的粒子回调正在运行，跳过本次执行" % player_id_str)
-                return
-            
-            self.player_particle_timer_running[player_id_str] = True
-            
-            logger.info("[粒子回调] 检查玩家 %s 的暗影形态" % player_id_str)
-            # 检查玩家是否有暗影形态tag
-            tag_comp = SCF.CreateTag(player_id_str)
-            has_berserk_tag = tag_comp.EntityHasTag("shadow_berserk")
-            
-            if has_berserk_tag:
-                logger.info("[粒子回调] 玩家 %s 有暗影形态tag，播放粒子" % player_id_str)
-                # 继续播放粒子
-                self.playPlayerParticle(player_id_str)
-                # 先停止旧定时器，再创建新定时器（防止重复）
-                if player_id_str in self.player_particle_timers:
-                    old_timer_id = self.player_particle_timers[player_id_str]
-                    time_comp = SCF.CreateGame(levelId)
-                    time_comp.CancelTimer(old_timer_id)
-                    logger.info("[粒子回调] 已取消玩家 %s 的旧粒子定时器" % player_id_str)
-                # 重新设置定时器
-                time_comp = SCF.CreateGame(levelId)
-                timer_id = time_comp.AddTimer(1.0, lambda pid=player_id_str: self._playerParticleTimerCallback(pid))
-                self.player_particle_timers[player_id_str] = timer_id
-            else:
-                logger.info("[粒子回调] 玩家 %s 没有暗影形态tag，停止粒子定时器" % player_id_str)
-                # 没有暗影形态tag，停止定时器
-                self.stopPlayerParticleTimer(player_id_str)
-                
-        except Exception as e:
-            logger.error("_playerParticleTimerCallback error: %s" % str(e))
-        finally:
-            # 确保无论如何都重置运行标志
-            self.player_particle_timer_running[player_id_str] = False
-
-    def playPlayerParticle(self, player_id_str):
-        """为玩家播放粒子效果"""
-        try:
-            # 使用/execute命令在玩家位置播放粒子
-            particle_command = "/execute at @s run particle sf:shadow_smoke ~ ~ ~ "
-            
-            cmd_comp = SCF.CreateCommand(levelId)
-            cmd_comp.SetCommand(particle_command, player_id_str)
-            
-        except Exception as e:
-            logger.error("playPlayerParticle error: %s" % str(e))
-
-    def startPlayerEnergyDecayTimer(self, player_id_str):
-        """启动玩家能量递减定时器"""
-        try:
-            # 创建循环定时器，每1秒减少1点能量
-            time_comp = SCF.CreateGame(levelId)
-            timer_id = time_comp.AddTimer(1.0, lambda pid=player_id_str: self._playerEnergyDecayCallback(pid))
-            # 存储定时器ID（如果需要后续停止）
-            if not hasattr(self, 'player_energy_decay_timers'):
-                self.player_energy_decay_timers = {}
-            self.player_energy_decay_timers[player_id_str] = timer_id
-            
-            logger.info("玩家 %s 能量递减定时器已启动" % player_id_str)
-            
-        except Exception as e:
-            logger.error("startPlayerEnergyDecayTimer error: %s" % str(e))
-
-    def stopPlayerEnergyDecayTimer(self, player_id_str):
-        """停止玩家能量递减定时器"""
-        try:
-            if hasattr(self, 'player_energy_decay_timers') and player_id_str in self.player_energy_decay_timers:
-                timer_id = self.player_energy_decay_timers[player_id_str]
-                # 真正取消定时器
-                time_comp = SCF.CreateGame(levelId)
-                time_comp.CancelTimer(timer_id)
-                # 移除定时器记录
-                del self.player_energy_decay_timers[player_id_str]
-                logger.info("玩家 %s 能量递减定时器已停止" % player_id_str)
-            else:
-                logger.info("玩家 %s 没有活跃的能量递减定时器，无需停止" % player_id_str)
-            
-        except Exception as e:
-            logger.error("stopPlayerEnergyDecayTimer error: %s" % str(e))
-
-    def _playerEnergyDecayCallback(self, player_id_str):
-        """玩家能量递减回调函数"""
-        try:
-            # 防止重入：如果已经在运行，直接返回
-            if self.player_energy_decay_timer_running.get(player_id_str, False):
-                logger.warning("[能量递减回调] 玩家 %s 的能量递减回调正在运行，跳过本次执行" % player_id_str)
-                return
-            
-            self.player_energy_decay_timer_running[player_id_str] = True
-            
-            # 检查玩家是否有暗影形态tag
-            has_berserk_tag = False
-            try:
-                tag_comp = SCF.CreateTag(player_id_str)
-                has_berserk_tag = tag_comp.EntityHasTag("shadow_berserk")
-            except Exception as e:
-                logger.warning("[能量递减回调] Tag API调用失败，使用字典后备方案: %s" % str(e))
-                has_berserk_tag = self.player_shadow_effects.get(player_id_str) == "berserk"
-            
-            # 如果没有tag，停止定时器
-            if not has_berserk_tag:
-                logger.info("[能量递减回调] 玩家 %s 没有暗影形态tag，停止能量递减定时器" % player_id_str)
-                self.stopPlayerEnergyDecayTimer(player_id_str)
-                self.player_energy_decay_timer_running[player_id_str] = False
-                return
-
-            # 获取当前能量值
-            current_energy = self.player_energy_values.get(player_id_str, 0)
-            
-            # 计算新能量值
-            new_energy = current_energy - 1
-            
-            # 如果能量会减到0或以下
-            if new_energy <= 0:
-                logger.info("[能量递减回调] 玩家 %s 能量从 %s 减至0，移除tag并停止所有效果" % (player_id_str, current_energy))
-                # 更新服务端副本
-                self.player_energy_values[player_id_str] = 0
-                # 同步能量为0
-                self.sendClient(player_id_str, config.SetPlayerShadowEnergyEvent, {
-                    "energy_value": 0
-                })
-                # 移除tag
-                cmd_comp = SCF.CreateCommand(levelId)
-                remove_tag_command = "/tag @s remove shadow_berserk"
-                cmd_comp.SetCommand(remove_tag_command, player_id_str)
-                # 清除字典记录
-                if player_id_str in self.player_shadow_effects:
-                    del self.player_shadow_effects[player_id_str]
-                # 停止粒子效果定时器
-                self.stopPlayerParticleTimer(player_id_str)
-                # 停止能量递减定时器
-                self.stopPlayerEnergyDecayTimer(player_id_str)
-                self.player_energy_decay_timer_running[player_id_str] = False
-                return
-            
-            # 更新服务端副本
-            self.player_energy_values[player_id_str] = new_energy
-            
-            # 发送减少事件
-            self.shadowSystemPlayer(player_id_str, "reduce", 1)
-            
-            # 播放粒子效果
-            self.playPlayerParticle(player_id_str)
-            
-            # 重置运行标记
-            self.player_energy_decay_timer_running[player_id_str] = False
-            
-            # 重新设置定时器（先停止旧定时器，防止重复）
-            if player_id_str in self.player_energy_decay_timers:
-                old_timer_id = self.player_energy_decay_timers[player_id_str]
-                time_comp = SCF.CreateGame(levelId)
-                time_comp.CancelTimer(old_timer_id)
-                logger.info("[能量递减回调] 已取消玩家 %s 的旧能量递减定时器" % player_id_str)
-            
-            time_comp = SCF.CreateGame(levelId)
-            timer_id = time_comp.AddTimer(1.0, lambda pid=player_id_str: self._playerEnergyDecayCallback(pid))
-            if not hasattr(self, 'player_energy_decay_timers'):
-                self.player_energy_decay_timers = {}
-            self.player_energy_decay_timers[player_id_str] = timer_id
-            
-        except Exception as e:
-            logger.error("_playerEnergyDecayCallback error: %s" % str(e))
-        finally:
-            # 确保无论如何都重置运行标志
-            self.player_energy_decay_timer_running[player_id_str] = False
 
     def GetSkillConfig(self, skill_id):
         """获取技能配置"""
@@ -765,6 +540,16 @@ class ShadowServerSystem(ServerSubsystem):
         playerId = args.playerId
         print playerId
         if not playerId:
+            return
+
+        # 检查玩家是否处于暗影抑制状态（直接检查效果状态，不依赖时间戳）
+        player_id_str = str(playerId)
+        if self.player_shadow_effects.get(player_id_str) == "suppression":
+            logger.info("[暗影能量物品] 玩家 %s 处于暗影抑制状态，无法使用物品增加能量" % playerId)
+            # 发送提示给玩家
+            cmd_comp = SCF.CreateCommand(levelId)
+            title_cmd = "/title @s actionbar §c你处于暗影抑制状态，无法增加能量！"
+            cmd_comp.SetCommand(title_cmd, player_id_str)
             return
 
         item_comp = serverApi.GetEngineCompFactory().CreateItem(playerId)
@@ -785,7 +570,7 @@ class ShadowServerSystem(ServerSubsystem):
             item_comp.SetInvItemNum(selectedSlot, 0)
         else:
             item_comp.SetInvItemNum(selectedSlot, new_count)
-        self.shadowSystemPlayer(playerId, "add", 8)
+        self.shadowSystemPlayer(playerId, "add", energy_shadow)
         print "333"
 
     def ProcessSkillUpgrade(self, player_id, skill_id, fragment_cost, current_level):
@@ -1010,8 +795,29 @@ class ShadowServerSystem(ServerSubsystem):
             skill_id = args.skill
             player_id = args.playerId
             item_identifier_used = args.itemIdentifier
-            damage_multiplier = args.damageMultiplier  # 获取伤害乘数
-
+            damage_multiplier = args.damageMultiplier 
+            cmd_comp = SCF.CreateCommand(levelId)
+            time_comp = SCF.CreateGame(levelId) 
+            def Juhedao():
+                PlayerMotion(2.0)
+                time_comp.AddTimer(0.1, WindmillDelayDamage)
+                time_comp.AddTimer(0.2, WindmillDelayDamage)
+                time_comp.AddTimer(0.3, WindmillDelayDamage)
+                time_comp.AddTimer(0.4, WindmillDelayDamage)
+            def PlayerMotion(motion_size):
+                motion_comp = SCF.CreateActorMotion(player_id)
+                rot_comp = SCF.CreateRot(player_id)
+                if rot_comp:
+                    player_rot = rot_comp.GetRot()
+                    if player_rot:
+                        dir_x, dir_y, dir_z = serverApi.GetDirFromRot(player_rot)
+                        motion_comp.SetPlayerMotion((dir_x * motion_size, 0, dir_z * motion_size))
+            def ShadowOnslaughtDelayDamage():
+                damage_command = "/execute as @s at @s run damage @e[r=2,type=!player] {} entity_attack entity @s".format(int(30 * damage_multiplier))
+                cmd_comp.SetCommand(damage_command, player_id)
+            def WindmillDelayDamage():
+                damage_command = "/execute as @s at @s run damage @e[r=2,type=!player] {} entity_attack entity @s".format(int(5 * damage_multiplier))
+                cmd_comp.SetCommand(damage_command, player_id)
             def DelayCommand():
                 command_list = [
                     "execute as @s at @s positioned ^ ^ ^8 run damage @e[r=3,type=!player] {} entity_attack entity @s",
@@ -1042,6 +848,19 @@ class ShadowServerSystem(ServerSubsystem):
                 logger.error("未知技能ID: %s" % skill_id)
                 return
 
+            # 获取技能消耗的能量
+            energy_cost = skill_cfg.get("energy_cost", 0)
+            
+            # 检查并减少玩家能量（服务端权威控制）
+            player_id_str = str(player_id)
+            current_energy = self.player_energy_values.get(player_id_str, 0)
+            if current_energy < energy_cost:
+                logger.warning("玩家 %s 能量不足，无法释放技能 %s" % (player_id_str, skill_id))
+                return
+            
+            # 减少能量
+            self.shadowSystemPlayer(player_id_str, "reduce", energy_cost)
+
             # 确定要执行的命令列表
             commands_to_execute = []
             if item_identifier_used and "valid_items" in skill_cfg:
@@ -1055,14 +874,18 @@ class ShadowServerSystem(ServerSubsystem):
                 commands_to_execute = skill_cfg["valid_items"][0].get("server_commands", [])
 
             # 执行命令
-            cmd_comp = SCF.CreateCommand(levelId)
             for command in commands_to_execute:
                 cmd_comp.SetCommand(command, player_id)
+            if skill_id == "weapon" and item_identifier_used == "sf:world_slicer":
+                PlayerMotion(3.0)
+                time_comp.AddTimer(1.0, PlayerMotion(-1.0))
+                time_comp.AddTimer(0.5, ShadowOnslaughtDelayDamage)
+            if skill_id == "weapon" and (item_identifier_used == "sf:purple_peeler" or item_identifier_used == "sf:fates_end"):
+                Juhedao()
             if skill_id == "RW" and item_identifier_used == "minecraft:arrow":
-                time_comp = SCF.CreateGame(levelId)
                 time_comp.AddTimer(1.0, DelayCommand)
             if skill_id == "armor" and item_identifier_used == "sf:burden_of_loneliness":
-                damage_command = "/execute as @s at @s run damage @e[r=5,type=!player] {} entity_attack entity @s".format(int(30 * damage_multiplier))
+                damage_command = "/execute as @s at @s run damage @e[r=3,type=!player] {} entity_attack entity @s".format(int(30 * damage_multiplier))
                 cmd_comp.SetCommand(damage_command,player_id)
             if skill_id == "helmet" and item_identifier_used == "sf:eye_of_time":
                 self.player_skill_damage_multipliers[player_id] = damage_multiplier
@@ -1245,7 +1068,12 @@ class ShadowServerSystem(ServerSubsystem):
                     if entity_identifier and entity_identifier.startswith("sf:") and "trader" not in entity_identifier:
                         logger.info("玩家 %s 攻击实体 %s (标识符: %s)，玩家和实体都获得暗影能量" % (attacker_id, hurt_entity_id, entity_identifier))
                         # 给玩家增加暗影能量
-                        self.shadowSystemPlayer(attacker_id, "add", 3)
+                        add_result = self.shadowSystemPlayer(attacker_id, "add", 3)
+                        # 如果玩家处于抑制状态，发送提示
+                        if add_result is False:
+                            cmd_comp = SCF.CreateCommand(levelId)
+                            title_cmd = "/title @s actionbar §c你处于暗影抑制状态，无法增加能量！"
+                            cmd_comp.SetCommand(title_cmd, str(attacker_id))
                         # 给实体增加暗影能量
                         self.SendShadowEnergyToEntity(hurt_entity_id, 10)
                         # 为实体绑定头顶UI
@@ -1266,32 +1094,177 @@ class ShadowServerSystem(ServerSubsystem):
         玩家受伤事件 - 玩家被实体攻击
         """
         try:
-            # 从事件参数中获取数据
-            hurt_player_id = args.id  # PlayerHurtEvent中受伤玩家参数是id
-            attacker_id = args.attacker  # PlayerHurtEvent中攻击者参数是attacker
+            hurt_player_id = args.id
+            attacker_id = args.attacker
 
             if not hurt_player_id or not attacker_id:
                 return
 
-            # 检查攻击者是否是实体（非玩家）
             player_list = serverApi.GetPlayerList()
             if attacker_id not in player_list:
-                # 检查攻击实体的标识符是否为 sf: 开头且不包含 trader
                 entity_identifier = self.getEntityIdentifier(attacker_id)
                 if entity_identifier and entity_identifier.startswith("sf:") and "trader" not in entity_identifier:
-                    # 玩家被实体攻击，玩家和实体都获得暗影能量
                     logger.info("玩家 %s 被实体 %s (标识符: %s) 攻击，玩家和实体都获得暗影能量" % (hurt_player_id, attacker_id, entity_identifier))
-                    # 给玩家增加暗影能量
-                    self.shadowSystemPlayer(hurt_player_id, "add", 10)
-                    # 给实体增加暗影能量
+                    add_result = self.shadowSystemPlayer(hurt_player_id, "add", 10)
+                    if add_result is False:
+                        cmd_comp = SCF.CreateCommand(levelId)
+                        title_cmd = "/title @s actionbar §c你处于暗影抑制状态，无法增加能量！"
+                        cmd_comp.SetCommand(title_cmd, str(hurt_player_id))
                     self.SendShadowEnergyToEntity(attacker_id, 3)
-                    # 为实体绑定头顶UI
                     self.NotifyClientToBindUI(attacker_id)
+                    self.TryReleaseMonsterSkill(attacker_id, hurt_player_id)
                 else:
                     logger.info("玩家 %s 被实体 %s 攻击，但标识符不符合条件，跳过UI绑定" % (hurt_player_id, attacker_id))
 
         except Exception as e:
             logger.error("PlayerHurtEvent error: %s" % str(e))
+
+    def TryReleaseMonsterSkill(self, monster_id, target_player_id):
+        """尝试释放怪物技能 - 使用StateTree管理前摇->攻击流程"""
+        try:
+            tree = self._getOrCreateMonsterAttackTree(monster_id)
+            current = tree.currentState()
+            if current is None or current.name != 'idle':
+                logger.info("怪物 %s 当前状态为 %s，跳过技能释放" % (monster_id, current.name if current else 'None'))
+                return
+
+            current_state = self.getEntityShadowState(monster_id)
+            monster_energy = current_state.get("shadow_data", 0)
+            if monster_energy <= 20:
+                return
+
+            monster_skill_ids = ["helmet", "armor", "weapon", "RW"]
+
+            for skill_id in monster_skill_ids:
+                if random.random() < 0.5:
+                    tree.mapping['skill_id'] = skill_id
+                    tree.mapping['target_id'] = target_player_id
+                    tree.finishTasks()
+                    tree.execute()
+                    logger.info("怪物 %s 进入前摇状态，准备释放技能 %s" % (monster_id, skill_id))
+                    break
+
+        except Exception as e:
+            logger.error("TryReleaseMonsterSkill error: %s" % str(e))
+
+    def ExecuteMonsterSkill(self, monster_id, target_player_id, skill_id):
+        """执行怪物技能 - 消耗20能量"""
+        try:
+            def DelayCommand():
+                command_list = [
+                    "execute as @s at @s positioned ^ ^ ^8 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^7.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^7 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^6.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^6 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^5.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^4.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^4 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^3.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^3 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^2.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^2 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^1.5 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^1 run damage @e[r=3] {} entity_attack entity @s",
+                    "execute as @s at @s positioned ^ ^ ^0.5 run damage @e[r=3] {} entity_attack entity @s"
+                ]
+                for delay_command in command_list:
+                    cmd_comp.SetCommand(delay_command.format(5, monster_id))
+            def MonsterMotion(motion_size):
+                motion_comp = SCF.CreateActorMotion(monster_id)
+                rot_comp = SCF.CreateRot(monster_id)
+                if rot_comp:
+                    player_rot = rot_comp.GetRot()
+                    if player_rot:
+                        dir_x, dir_y, dir_z = serverApi.GetDirFromRot(player_rot)
+                        motion_comp.SetPlayerMotion((dir_x * motion_size, 0, dir_z * motion_size))
+            current_state = self.getEntityShadowState(monster_id)
+            monster_energy = current_state.get("shadow_data", 0)
+
+            if monster_energy < 20:
+                return
+
+            new_energy = monster_energy - 20
+            new_state = {
+                "shadow_data": new_energy,
+                "clip_ratio": 1.0 - (new_energy / 100.0),
+                "is_full": (new_energy >= 100)
+            }
+            self.setEntityShadowState(monster_id, new_state)
+
+            cmd_comp = SCF.CreateCommand(levelId)
+            time_comp = SCF.CreateGame(levelId)
+
+            if skill_id == "helmet":
+                pos_comp = SCF.CreatePos(monster_id)
+                rot_comp = SCF.CreateRot(monster_id)
+                if pos_comp and rot_comp:
+                    monster_pos = pos_comp.GetFootPos()
+                    monster_rot = rot_comp.GetRot()
+                    if monster_pos and monster_rot:
+                        dir_x, dir_y, dir_z = serverApi.GetDirFromRot(monster_rot)
+                        spawn_pos = (monster_pos[0], monster_pos[1] + 1.5, monster_pos[2])
+                        direction = (dir_x, dir_y, dir_z)
+                        param = {
+                            "position": spawn_pos,
+                            "direction": direction,
+                            "power": 1.5,
+                            "gravity": 0.0
+                        }
+                        projectile_comp = SCF.CreateProjectile(levelId)
+                        projectile_comp.CreateProjectileEntity(monster_id, "sf:shadowball_eruption", param)
+                cmd_list = [
+                    "/playsound shadow.ability.eruption @e[r=5,type=player]",
+                    "/playanimation @s animation.player.eruption"
+                ]
+                for cmd in cmd_list:
+                    cmd_comp.SetCommand(cmd, monster_id)
+            elif skill_id == "armor":
+                cmd_list = [
+                    "/playsound shadow.ability.blast @e[r=5,type=player]",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @e[r=5,type=player] 2 0.1",
+                    "/execute as @s at @s run particle sf:blast",
+                    "/execute as @s at @s run damage @e[r=3,type=player] 5 entity_attack entity @s"
+                ]
+                for cmd in cmd_list:
+                    cmd_comp.SetCommand(cmd, monster_id)
+                    if cmd == cmd_list[-1]:  # 最后一条命令是伤害命令，延迟执行
+                        time_comp.AddTimer(0.5, lambda tid=monster_id: self._monsterAoeDamage(tid, 3))
+            elif skill_id == "weapon":
+                cmd_list = [
+                    "/playsound shadow.ability.shadow_onslaught @e[r=5,type=player]",
+                    "/playanimation @s animation.player.shadow_onslaught"
+                ]
+                MonsterMotion(3.0)
+                time_comp.AddTimer(1.0, MonsterMotion(-1.0))
+                for cmd in cmd_list:
+                    cmd_comp.SetCommand(cmd, monster_id)
+                for i in range(8):
+                    time_comp.AddTimer(i * 0.15, lambda tid=monster_id: self._monsterAoeDamage(tid, 5))
+            elif skill_id == "RW":
+                cmd_list = [
+                    "/playsound shadow.ability.shadow_blast @e[r=5,type=player]",
+                    "/playanimation @s animation.player.shadow_blast.particle",
+                    "/playanimation @s animation.player.shadow_blast"
+                ]
+                for cmd in cmd_list:
+                    cmd_comp.SetCommand(cmd, monster_id)
+                time_comp.AddTimer(1.0, DelayCommand)
+            logger.info("怪物 %s 释放技能 %s，消耗20能量，剩余能量 %s" % (monster_id, skill_id, new_energy))
+
+        except Exception as e:
+            logger.error("ExecuteMonsterSkill error: %s" % str(e))
+
+    def _monsterAoeDamage(self, monster_id, radius):
+        """怪物AOE伤害辅助方法"""
+        try:
+            cmd_comp = SCF.CreateCommand(levelId)
+            damage_cmd = "/execute as @s at @s run damage @e[r=%s,type=player] 5 entity_attack entity @s" % radius
+            cmd_comp.SetCommand(damage_cmd, monster_id)
+        except Exception as e:
+            logger.error("_monsterAoeDamage error: %s" % str(e))
 
     @CustomEvent(config.RequestEntityShadowDataEvent)
     def OnRequestEntityShadowData(self, args):
@@ -1326,55 +1299,37 @@ class ShadowServerSystem(ServerSubsystem):
             
             if effectName == "sf:shadow_dampener_effect":
                 logger.info("玩家 %s 应用暗影抑制效果" % entityId)
-                
+
+                # 设置玩家效果状态为抑制（直接检查此状态来判断是否处于抑制，不依赖时间戳）
+                self.player_shadow_effects[player_id_str] = "suppression"
+                logger.info("[抑制剂] 玩家 %s 进入暗影抑制状态" % entityId)
+
                 # 检查玩家是否处于暗影形态
                 if self.player_shadow_effects.get(player_id_str) == "berserk":
                     logger.info("[抑制剂] 玩家 %s 处于暗影形态，喝下暗影抑制剂，停止暗影形态" % entityId)
-                    
+
                     # 清除暗影形态标记
                     if player_id_str in self.player_shadow_effects:
                         del self.player_shadow_effects[player_id_str]
                         logger.info("[抑制剂] 清除玩家 %s 的暗影形态标记" % entityId)
-                    
-                    # 设置能量为0
-                    if not hasattr(self, 'player_energy_values'):
-                        self.player_energy_values = {}
-                    self.player_energy_values[player_id_str] = 0
-                    
-                    # 同步能量值0给客户端
-                    self.sendClient(entityId, config.SetPlayerShadowEnergyEvent, {
-                        "energy_value": 0
-                    })
-                    logger.info("[抑制剂] 同步玩家 %s 能量值为0给客户端" % entityId)
-                    
-                    # 移除玩家的 shadow_berserk tag
-                    cmd_comp = SCF.CreateCommand(serverApi.GetLevelId())
-                    remove_tag_command = "/tag @s remove shadow_berserk"
-                    cmd_comp.SetCommand(remove_tag_command, player_id_str)
-                    logger.info("[抑制剂] 移除玩家 %s 的 shadow_berserk tag" % entityId)
-                    
-                    # 停止粒子效果定时器
-                    if hasattr(self, 'player_particle_timers') and player_id_str in self.player_particle_timers:
-                        timer_id = self.player_particle_timers[player_id_str]
-                        time_comp = SCF.CreateGame(levelId)
-                        time_comp.CancelTimer(timer_id)
-                        del self.player_particle_timers[player_id_str]
-                        logger.info("[抑制剂] 停止玩家 %s 的粒子效果定时器" % entityId)
-                    
-                    # 停止能量递减定时器
-                    if hasattr(self, 'player_energy_decay_timers') and player_id_str in self.player_energy_decay_timers:
-                        timer_id = self.player_energy_decay_timers[player_id_str]
-                        time_comp = SCF.CreateGame(levelId)
-                        time_comp.CancelTimer(timer_id)
-                        del self.player_energy_decay_timers[player_id_str]
-                        logger.info("[抑制剂] 停止玩家 %s 的能量递减定时器" % entityId)
-                    
-                    # 清除玩家的所有effect效果
-                    self.clearPlayerEffects(player_id_str)
-                
-                # 设置抑制状态
-                self.player_shadow_effect = "suppression"
-                
+
+                # 设置能量为0
+                if not hasattr(self, 'player_energy_values'):
+                    self.player_energy_values = {}
+                self.player_energy_values[player_id_str] = 0
+
+                # 同步能量值0给客户端
+                self.sendClient(entityId, config.SetPlayerShadowEnergyEvent, {
+                    "energy_value": 0
+                })
+                logger.info("[抑制剂] 同步玩家 %s 能量值为0给客户端" % entityId)
+
+                # 给予力量5效果，持续60秒
+                cmd_comp = SCF.CreateCommand(levelId)
+                strength_command = "/effect @s strength 60 4 false"
+                cmd_comp.SetCommand(strength_command, player_id_str)
+                logger.info("[抑制剂] 为玩家 %s 施加强量5效果，持续60秒" % entityId)
+
                 # 通知客户端更新UI为抑制状态
                 self.sendClient(entityId, config.PlayerShadowEffectEvent, {
                     "clip_ratio": 1.0,
@@ -1385,10 +1340,20 @@ class ShadowServerSystem(ServerSubsystem):
                 logger.info("[抑制剂] 通知客户端玩家 %s 进入抑制状态" % entityId)
                 
             elif effectName == "sf:shadow_overcharger_effect":
+                # 检查玩家是否处于暗影抑制状态（直接检查效果状态，不依赖时间戳）
+                if self.player_shadow_effects.get(player_id_str) == "suppression":
+                    # 玩家处于抑制状态，阻止充能效果
+                    logger.info("[充能药剂] 玩家 %s 处于暗影抑制状态，无法应用充能效果" % entityId)
+                    # 清除玩家身上的充能效果
+                    cmd_comp = SCF.CreateCommand(levelId)
+                    clear_charging_cmd = "/title @s actionbar §c你处于暗影抑制状态，无法充能！"
+                    cmd_comp.SetCommand(clear_charging_cmd, player_id_str)
+                    return
+
                 # 先移除抑制效果（如果存在）
-                if hasattr(self, 'player_shadow_effect') and self.player_shadow_effect == "suppression":
+                if self.player_shadow_effects.get(player_id_str) == "suppression":
                     logger.info("玩家 %s 移除暗影抑制效果" % entityId)
-                self.player_shadow_effect = "charging"
+                self.player_shadow_effects[player_id_str] = "charging"
                 self.sendClient(entityId, config.PlayerShadowEffectEvent, {
                     "clip_ratio": 0.0,
                     "shadow_data": 100,
@@ -1396,16 +1361,18 @@ class ShadowServerSystem(ServerSubsystem):
                     "effect": "charging"
                 })
                 logger.info("玩家 %s 应用暗影充能效果" % entityId)
-                
-                # 设置玩家能量值为100（关键：必须在触发暗影形态之前设置）
+
+                # 设置玩家能量值为100
                 if not hasattr(self, 'player_energy_values'):
                     self.player_energy_values = {}
                 self.player_energy_values[str(entityId)] = 100
                 logger.info("[充能药剂] 设置玩家 %s 能量值为100" % entityId)
-                
-                # 触发暗影形态：粒子效果、能量递减、持续effect
-                logger.info("[充能药剂] 玩家 %s 使用暗影充能药剂，触发暗影形态" % entityId)
-                self.checkPlayerBerserkMode(entityId, 100)
+
+                # 同步能量值100给客户端配置，确保客户端和服务端能量值一致
+                self.sendClient(entityId, config.SetPlayerShadowEnergyEvent, {
+                    "energy_value": 100
+                })
+                logger.info("[充能药剂] 同步玩家 %s 能量值100给客户端配置" % entityId)
         else:
             # 实体获得效果
             entity_id_str = str(entityId)
@@ -1449,26 +1416,25 @@ class ShadowServerSystem(ServerSubsystem):
                 })
                 logger.info("实体 %s 应用暗影充能效果" % entity_id_str)
 
-    # @EventListener("RemoveEffectServerEvent")
-    # def OnEffectRemoved(self, args):
-    #     logger.info("RemoveEffectServerEvent")
-    #     entityId = args.entityId
-    #     effectName = args.effectName
-    #     player_list = serverApi.GetPlayerList()
+    @EventListener("RemoveEffectServerEvent")
+    def OnEffectRemoved(self, args):
+        logger.info("RemoveEffectServerEvent")
+        entityId = args.entityId
+        effectName = args.effectName
+        player_list = serverApi.GetPlayerList()
 
-    #     if entityId in player_list:
-    #         # 玩家移除效果
-    #         self.removePlayerShadowEffect(entityId)
-    #     else:
-    #         # 实体移除效果
-    #         self.removeShadowEffect(entityId)
-    
+        if entityId in player_list:
+            # 玩家移除效果
+            self.removePlayerShadowEffect(entityId)
+        else:
+            # 实体移除效果
+            self.removeShadowEffect(entityId)
+
     @EventListener("RefreshEffectServerEvent")
     def OnEffectRefreshed(self, args):
         # logger.info("RefreshEffectServerEvent")
         entityId = args.entityId
         effectName = args.effectName
-        effectDuration = args.effectDuration if hasattr(args, 'effectDuration') else 0
         player_list = serverApi.GetPlayerList()
 
         if entityId in player_list:
@@ -1477,63 +1443,41 @@ class ShadowServerSystem(ServerSubsystem):
             if self.player_shadow_effects.get(player_id_str) == "berserk":
                 # 静默跳过，不记录日志以避免 spam
                 return
-            
+
             # 只处理暗影抑制和充能效果
             if effectName not in ["sf:shadow_dampener_effect", "sf:shadow_overcharger_effect"]:
                 return
-            
-            # 初始化效果时间存储
-            if player_id_str not in self.player_effect_durations:
-                self.player_effect_durations[player_id_str] = {"suppression": 0, "charging": 0}
-            
-            # 更新当前效果的时间
+
+            # 根据当前刷新的效果直接应用，不再比较两个效果的时间
             if effectName == "sf:shadow_dampener_effect":
-                self.player_effect_durations[player_id_str]["suppression"] = effectDuration
-            elif effectName == "sf:shadow_overcharger_effect":
-                self.player_effect_durations[player_id_str]["charging"] = effectDuration
-            
-            # 比较两个效果的时间，使用较大的那个
-            suppression_time = self.player_effect_durations[player_id_str]["suppression"]
-            charging_time = self.player_effect_durations[player_id_str]["charging"]
-            
-            if suppression_time >= charging_time:
-                # 暗影抑制时间更长或相等，应用抑制效果
                 self.applyPlayerShadowSuppression(entityId)
-                logger.info("玩家 %s 暗影抑制时间(%d) >= 暗影充能时间(%d)，应用抑制效果" % (entityId, suppression_time, charging_time))
-            else:
-                # 暗影充能时间更长，应用充能效果
+                logger.info("玩家 %s 刷新暗影抑制效果，应用抑制效果" % entityId)
+            elif effectName == "sf:shadow_overcharger_effect":
+                # 检查玩家是否处于暗影抑制状态
+                if self.player_shadow_effects.get(player_id_str) == "suppression":
+                    logger.info("[充能药剂] 玩家 %s 处于暗影抑制状态，无法刷新充能效果" % entityId)
+                    # 发送提示给玩家
+                    cmd_comp = SCF.CreateCommand(levelId)
+                    title_cmd = "/title @s actionbar §c你处于暗影抑制状态，无法充能！"
+                    cmd_comp.SetCommand(title_cmd, player_id_str)
+                    return
                 self.applyPlayerShadowCharging(entityId)
-                logger.info("玩家 %s 暗影充能时间(%d) > 暗影抑制时间(%d)，应用充能效果" % (entityId, charging_time, suppression_time))
+                logger.info("玩家 %s 刷新暗影充能效果，应用充能效果" % entityId)
         else:
             # 实体获得效果
             entity_id_str = str(entityId)
-            
+
             # 只处理暗影抑制和充能效果
             if effectName not in ["sf:shadow_dampener_effect", "sf:shadow_overcharger_effect"]:
                 return
-            
-            # 初始化效果时间存储
-            if entity_id_str not in self.entity_effect_durations:
-                self.entity_effect_durations[entity_id_str] = {"suppression": 0, "charging": 0}
-            
-            # 更新当前效果的时间
+
+            # 根据当前刷新的效果直接应用，不再比较两个效果的时间
             if effectName == "sf:shadow_dampener_effect":
-                self.entity_effect_durations[entity_id_str]["suppression"] = effectDuration
-            elif effectName == "sf:shadow_overcharger_effect":
-                self.entity_effect_durations[entity_id_str]["charging"] = effectDuration
-            
-            # 比较两个效果的时间，使用较大的那个
-            suppression_time = self.entity_effect_durations[entity_id_str]["suppression"]
-            charging_time = self.entity_effect_durations[entity_id_str]["charging"]
-            
-            if suppression_time >= charging_time:
-                # 暗影抑制时间更长或相等，应用抑制效果
                 self.applyShadowSuppression(entityId)
-                logger.info("实体 %s 暗影抑制时间(%d) >= 暗影充能时间(%d)，应用抑制效果" % (entityId, suppression_time, charging_time))
-            else:
-                # 暗影充能时间更长，应用充能效果
+                logger.info("实体 %s 刷新暗影抑制效果，应用抑制效果" % entityId)
+            elif effectName == "sf:shadow_overcharger_effect":
                 self.applyShadowCharging(entityId)
-                logger.info("实体 %s 暗影充能时间(%d) > 暗影抑制时间(%d)，应用充能效果" % (entityId, charging_time, suppression_time))
+                logger.info("实体 %s 刷新暗影充能效果，应用充能效果" % entityId)
 
     @EventListener("ProjectileDoHitEffectEvent")
     def OnProjectileHitBlock(self, args):
@@ -1721,8 +1665,6 @@ class ShadowServerSystem(ServerSubsystem):
                     logger.info("目标 %s 是玩家，使用 shadowSystemPlayer 设置能量" % entity_id)
                     self.shadowSystemPlayer(entity_id, "set", energy_value)
                     logger.info("玩家 %s 的暗影能量设置为 %s" % (entity_id, energy_value))
-                    # 检查暗影形态
-                    self.checkPlayerBerserkMode(entity_id, energy_value)
                 else:
                     # 实体：检查标识符是否符合条件
                     entity_id_str = str(entity_id)

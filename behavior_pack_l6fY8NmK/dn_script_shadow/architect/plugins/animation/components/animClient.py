@@ -1,14 +1,11 @@
+# -*- coding: utf-8 -*-
 import time
 
 from ....compact import remote, Component, BaseCompClient, getOneComponent, NamedEntityVariable
+from ....core.log import error as _log_error
 from ....utils.persona.client import PersonaRendererComponent
 from ....math.double import clamp, inf, epsilon
 from ..enum import AnimationEasingTypes, AnimationBlendingTypes, LoopType
-
-try:
-    from ......assets.animMeta import AnimMeta
-except:
-    print('[ERROR] 未找到 AnimMeta, 请使用 architect/tools/animExtractor 提取动画元数据')
 
 
 class AnimationEasingConf(object):
@@ -19,7 +16,7 @@ class AnimationEasingConf(object):
 
 
 class AnimPlayingInfo(object):
-    def __init__(self, entityId, animName, layer, startTime, playRate, serverSync=False):
+    def __init__(self, meta, entityId, animName, layer, startTime, playRate, serverSync=False):
         self.serverSync = serverSync
         self.animName = animName
         self.layer = layer
@@ -30,7 +27,6 @@ class AnimPlayingInfo(object):
         self.animTimeComp = NamedEntityVariable(entityId, 'anim_timeex.' + nameSuffix, 0)
         self._manualStop = False
         self._dt = epsilon
-        meta = AnimMeta[animName]
         self.duration = inf if meta['length'] == -1 else meta['length']
         self.notifies = meta.get('notifies')
         if meta['loop'] == True:
@@ -62,7 +58,7 @@ class AnimPlayingInfo(object):
     def getNotifies(self):
         if not self.notifies:
             return []
-        cur = self.playTime
+        cur = self.playTime % self.duration if self.loop == LoopType.LOOP else self.playTime
         prev = cur - self._dt
         for time, notifies in self.notifies.items():
             if prev < float(time) <= cur:
@@ -74,7 +70,9 @@ class AnimPlayingInfo(object):
         """
         动画进度, 始终返回 0 ~ 1
         """
-        return clamp((self.playTime % self.duration) / self.duration, 0, 1)
+        if self.loop == LoopType.LOOP:
+            return clamp((self.playTime % self.duration) / self.duration, 0, 1)
+        return clamp(self.playTime / self.duration, 0, 1)
 
     def isFinished(self):
         # type: () -> bool
@@ -84,9 +82,9 @@ class AnimPlayingInfo(object):
         """
         if self._manualStop:
             return True
-        if self.loop == LoopType.LOOP:
+        if self.loop in (LoopType.LOOP, LoopType.KEEP_LAST_FRAME):
             return False
-        elif self.loop in (LoopType.ONCE, LoopType.KEEP_LAST_FRAME):
+        elif self.loop == LoopType.ONCE:
             return self.playTime >= self.duration
         else:
             raise Exception('Unknown loop type: ' + self.loop)
@@ -94,6 +92,19 @@ class AnimPlayingInfo(object):
 
 @Component()
 class AnimationExComponent(BaseCompClient):
+    """
+    一定要使用 registerMetadatas 和 registerAnimations 注册动画，
+    否则该组件无法正常使用
+
+    该组件在本地玩家 AddPlayerCreatedClientEvent 事件触发时无法修改本地玩家动画，
+    但是可以用于其他玩家进入渲染时给其他玩家播放动画。
+
+    所以如果你需要在所有玩家加载完成时都播放，请同时在 AddPlayerCreatedClientEvent 事件
+    和 OnLocalPlayerStopLoading 事件中播放动画
+
+    这个操作影响最大的是 clientOnly 动画，因为跨端同步动画即使在 client 端播放失败，
+    也会在广播到自己时重新尝试播放一次。
+    """
 
     def onCreate(self, entityId):
         self.entityId = entityId
@@ -104,14 +115,22 @@ class AnimationExComponent(BaseCompClient):
         self.blendingConf = {} # type: dict[str, dict[str, AnimationEasingConf]]
         self.playing = {} # type: dict[str, AnimPlayingInfo]
         self.notifies = {}
+        self.animMetas = {}
+
+    def registerMetadatas(self, metadata):
+        for key, data in metadata.items():
+            self.animMetas[key] = data
 
     def registerAnimations(self, mapping):
         # type: (dict[str, str]) -> None
+        """
+        注册动画映射后需要调用 updateActorAnimDef
+        """
         for name, anim in mapping.items():
-            if anim in AnimMeta:
+            if anim in self.animMetas:
                 self.animations[name] = anim
             else:
-                print('[ERROR] 动画 {} 元数据不存在, 动画是否存在或通过 animExtractor 提取?'.format(anim))
+                _log_error('动画 {} 元数据不存在, 动画是否存在或通过 animExtractor 提取?', anim)
 
     def _createActorRendererAnims(self):
         animations = {}
@@ -195,8 +214,8 @@ class AnimationExComponent(BaseCompClient):
     def getPlayingAnimation(self, animKey):
         return self.playing.get(animKey)
 
-    def _playAnim(self, animKey, layer='default', replay=False, playRate=1, startTime=0, serverSync=False):
-        # type: (str, str, bool, float, float, bool) -> None
+    def _playAnim(self, animKey, layer='default', replay=False, playRate=1, startTime=0, serverSync=False, noBlending=False):
+        # type: (str, str, bool, float, float, bool, bool) -> None
         """
         不同 layer 的动画可以同时播放，但同一 layer 的动画不能同时播放
         """
@@ -217,7 +236,7 @@ class AnimationExComponent(BaseCompClient):
 
         # 创建动画播放运行时
         animInfo = AnimPlayingInfo(
-            self.entityId, self.animations[animKey],
+            self.animMetas[animName], self.entityId, self.animations[animKey],
             layer, startTime, playRate, serverSync
         )
         self.playing[animKey] = animInfo
@@ -234,11 +253,21 @@ class AnimationExComponent(BaseCompClient):
             for _animKey in list(playing):
                 if _animKey == animKey:
                     continue
-                self.setBlending(AnimationBlendingTypes.OUT, _animKey)
-                # 立即从 playing 中移除，blend out 视觉效果由 self.blending 独立驱动
+                if noBlending:
+                    _v = self.variables.get(_animKey)
+                    _v and _v.setValue(0)
+                else:
+                    self.setBlending(AnimationBlendingTypes.OUT, _animKey)
+                    # 立即从 playing 中移除，blend out 视觉效果由 self.blending 独立驱动
                 if _animKey in self.playing:
                     self.playing.pop(_animKey)
                 playing.discard(_animKey)
+
+        if noBlending:
+            variable.setValue(1)
+            playing.add(animKey)
+            self.layers[layer] = playing
+            return
 
         if not isBlendingOut:
             # 重置播放状态
@@ -254,15 +283,15 @@ class AnimationExComponent(BaseCompClient):
         playing.add(animKey)
         self.layers[layer] = playing
 
-    def play(self, animKey, layer='default', replay=False, playRate=1, startOffset=0, clientOnly=False):
-        # type: (str, str, bool, float, float, bool) -> None
+    def play(self, animKey, layer='default', replay=False, playRate=1, startOffset=0, clientOnly=False, noBlending=False):
+        # type: (str, str, bool, float, float, bool, bool) -> None
         startTime = time.time() - startOffset
-        self._playAnim(animKey, layer, replay, playRate, startTime)
+        self._playAnim(animKey, layer, replay, playRate, startTime, False, noBlending)
         if clientOnly:
             return
         remote.client.call(
             'AnimExServer._syncPlay',
-            animKey, layer, replay, playRate, startTime
+            animKey, layer, replay, playRate, startTime, noBlending,
         )
 
     def stop(self, animKey, layer='default', noBlending=False, clientOnly=False):

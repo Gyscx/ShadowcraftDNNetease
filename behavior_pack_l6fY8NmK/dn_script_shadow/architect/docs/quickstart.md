@@ -1,456 +1,597 @@
-# 快速开始
+# Quickstart — 快速开始
 
-本指南演示如何使用 `architect` 框架构建一个网易《我的世界》模组。
-
-所有 API 均可从 `architect.compact` 按需导入。
+本文从零开始引导你使用 RoninNetease 构建网易版《我的世界》模组，涵盖所有核心 API 和完整代码示例。
 
 ---
 
-## 1. 项目结构
+## 1. 环境要求
+
+- **Python 2.7**（网易 MC 引擎使用 Python 2.7，不受用户控制）
+- 网易《我的世界》开发者工具
+- 一个模组工程项目
+
+---
+
+## 2. 项目结构
+
+推荐的模组目录结构：
 
 ```
-my_mod/
-├── modMain.py              # 模组入口
-├── conf.py                 # 配置文件
-├── server_system.py        # 服务端子系统
-├── client_main.py          # 客户端子系统
-├── components.py           # 组件定义
-└── architect/              # 框架本体（符号链接或拷贝）
+your_mod/
+├── conf.py                # 用户配置（覆盖引擎默认配置）
+├── modMain.py             # 模组入口
+├── subsystems/            # 子系统目录
+│   ├── __init__.py
+│   └── mySystem.py
+├── components/            # 自定义组件
+│   └── health.py
+├── plugins/               # 用户插件（可选）
+└── architect/             # RoninNetease 框架（拷贝至此处）
 ```
 
 ---
 
-## 2. 配置文件 `conf.py`
+## 3. 入口文件 — `modMain.py`
 
-创建 `conf.py`，定义模组引擎名称和系统名称：
+框架通过网易的 `Mod` 绑定类启动。`Mod.Binding` 声明模组名称和版本，`Mod.InitServer` / `Mod.InitClient` 分别在服务端和客户端初始化时调用：
 
 ```python
-# ========== conf.py ==========
+# -*- coding: utf-8 -*-
+from mod.common.mod import Mod
+from .engine.architect.startup import createServer, createClient, conf
 
-MOD_ENGINE_NAME = 'my_mod'      # 引擎命名空间
-MOD_SYSTEM_NAME = 'my_system'   # 系统名称
+@Mod.Binding(name=conf('MOD_NAME'), version=conf('MOD_VERSION'))
+class ModBase(object):
+    @Mod.InitServer()
+    def initServer(self):
+        createServer()
+
+    @Mod.InitClient()
+    def initClient(self):
+        createClient()
+```
+
+`createServer()` 和 `createClient()` 会自动完成：
+1. 创建 `SubsystemManager`
+2. 扫描并导入配置中声明的模块列表
+3. 触发 `INITIALIZED` 信号 → 导入并加载插件
+4. 注册所有组件到引擎
+5. 实例化所有用 `SubsystemServer` / `SubsystemClient` 装饰的子系统
+6. 触发 `PRELOADED` 信号 → 调用所有子系统的 `onReady()` 和插件的 `onReady`
+7. 启动 Tick 循环和 Render 循环
+
+---
+
+## 4. 配置文件 — `conf.py`
+
+在模组根目录（`my_scripts/`）创建 `conf.py` 来覆盖框架默认配置：
+
+```python
+# -*- coding: utf-8 -*-
+
+# 基础信息
+MOD_NAME = 'my_mod'
+MOD_VERSION = '1.0.0'
+
+MOD_ENGINE_NAME = 'engine'   # 引擎系统名
+MOD_SYSTEM_NAME = 'system'   # 子系统名
+
+# 需要导入的模块（相对于 my_scripts 目录）
+MOD_SERVER_MODULES = [
+]
+MOD_CLIENT_MODULES = [
+]
+
+# 启用的插件列表
+PLUGINS = [
+]
 ```
 
 ---
 
-## 3. 模组入口 `modMain.py`
+## 5. 创建第一个子系统
+
+### 5.1 服务端子系统
 
 ```python
-# ========== modMain.py ==========
+# subsystems/mySystem.py
+from architect.core import SubsystemServer, ServerSubsystem, Sched
+from architect.core import EventListener, CustomEvent
 
-from architect.compact import createServer, createClient
-
-def modInit():
-    # 读取 conf.py 中的 MOD_ENGINE_NAME 和 MOD_SYSTEM_NAME 完成初始化
-    createServer()
-    createClient()
-```
-
----
-
-## 4. 服务端子系统
-
-使用 `@SubsystemServer` 装饰器注册子系统和 `Sched.Tick` 装饰器注册定时任务。
-
-```python
-# ========== server_system.py ==========
-
-from architect.compact import SubsystemServer
-from architect.compact import ServerSubsystem
-from architect.compact import Sched, LevelServer
-
-@SubsystemServer
 class MyServerSystem(ServerSubsystem):
+    canTick = True  # 启用 onUpdate
 
     def onInit(self):
-        print('[Server] Initialized')
+        """当前子系统创建完毕后调用"""
+        print('[MySystem] Server initialized')
 
-    # Sched.Tick() 让此方法在每个 Update 阶段执行
-    @Sched.Tick()
-    def onTick(self, args):
-        print('[Server] Tick')
+    def onReady(self):
+        """所有子系统初始化完毕后调用，此时可获取其他子系统"""
+        print('[MySystem] Server ready')
 
-    def onDestroy(self):
-        print('[Server] Destroyed')
-```
-
-### Sched 调度装饰器
-
-```python
-from architect.compact import Sched, SchedUpdateFlags, SchedEventFlags
-
-# 每帧 Update 阶段执行
-@Sched.Tick()
-
-# 在 Update 之前执行
-@Sched.Tick(SchedUpdateFlags.BeforeUpdate)
-
-# 在 Update 之后执行
-@Sched.Tick(SchedUpdateFlags.AfterUpdate)
-
-# 客户端渲染帧执行
-@Sched.Render()
-
-# 固定频率调度器（需配合 scheduleFixed 使用）
-@Sched.Fixed('my_fixed_sched')
-
-# 绑定到引擎事件（事件到达时执行）
-@Sched.Event('OnEntityDie')
-@Sched.Event('OnPlayerAttack', isCustom=False)
-```
-
----
-
-## 5. 客户端子系统
-
-```python
-# ========== client_main.py ==========
-
-from architect.compact import SubsystemClient
-from architect.compact import ClientSubsystem, LevelClient
-
-@SubsystemClient
-class MyClientSystem(ClientSubsystem):
-
-    def onInit(self):
-        self.canTick = True
-        print('[Client] Initialized')
-
-    # 使用 Sched.Render 实现每帧渲染更新
-    @Sched.Render()
-    def onRenderTick(self, args):
+    def onUpdate(self, dt):
+        """每 Tick 调用"""
         pass
 
     def onDestroy(self):
-        print('[Client] Destroyed')
-```
+        """子系统销毁时调用"""
+        pass
 
----
+    # 注册引擎事件监听
+    @EventListener('ServerPostInitEvent')
+    def onServerPostInit(self, event):
+        print('[MySystem] Server post init:', event)
 
-## 6. 组件 (Component)
-
-### 6.1 定义组件
-
-```python
-# ========== components.py ==========
-
-from architect.compact import Component, BaseCompServer, BaseCompClient
-
-# Component() 必须作为函数调用，返回装饰器
-@Component()
-class HealthCompServer(BaseCompServer):
-    def __init__(self):
-        self.health = 100
-        self.maxHealth = 100
-
-    def onCreate(self, entityId):
-        print('HealthComp created for %s' % entityId)
-
-    def takeDamage(self, amount):
-        self.health = max(0, self.health - amount)
-
-@Component()
-class HealthCompClient(BaseCompClient):
-    def __init__(self):
-        self.displayHealth = 100
-
-    def onSetData(self, data):
-        self.displayHealth = data.get('health', 100)
-```
-
-### 6.2 使用组件
-
-```python
-from architect.compact import createComponent, getComponent, getEntities, hasComponent
-
-def demo(entityId):
-    # 创建组件
-    createComponent(entityId, HealthCompServer)
-
-    # 获取组件
-    comp = getComponent(entityId, [HealthCompServer])
-    if comp:
-        healthComp = comp[0]
-        healthComp.takeDamage(10)
-
-    # 判断是否拥有组件
-    if hasComponent(entityId, HealthCompServer):
-        print('Has health component')
-
-    # 获取所有"被标记过"（拥有组件）的实体
-    for eid in getEntities():
-        print('Entity %s has at least one component' % eid)
-```
-
-### 6.3 单例组件
-
-```python
-from architect.compact import Component, BaseCompServer
-
-@Component(singleton=True)
-class GameConfigComp(BaseCompServer):
-    def __init__(self):
-        self.maxPlayers = 20
-```
-
-### 6.4 使用原生组件常量 (NeC / NeS)
-
-`NeC` 和 `NeS` 只提供原生组件的名称常量，用于 `getComponent` 查询：
-
-```python
-from architect.compact import NeC, NeS
-from .component.core import getComponent
-
-entityId = 'some_entity'
-
-# 获取原生位置组件（客户端）
-posComp = getComponent(entityId, [NeC.Pos])
-
-# 获取原生位置组件（服务端）
-posCompSrv = getComponent(entityId, [NeS.Pos])
-
-# 获取健康值组件
-healthComp = getComponent(entityId, [NeS.Health])
-```
-
----
-
-## 7. 事件监听
-
-### 7.1 使用 @EventListener 装饰器
-
-```python
-from architect.compact import SubsystemServer
-from architect.compact import ServerSubsystem
-from architect.compact import EventListener, CustomEvent
-
-@SubsystemServer
-class EventSystem(ServerSubsystem):
-
-    # @EventListener 装饰器会自动注册监听
-    @EventListener('OnEntityDie')
-    def onEntityDie(self, ev):
-        # ev 是 ChainedEvent 实例，通过属性访问数据
-        entityId = ev.id
-        print('Entity %s died' % entityId)
-
-    # @CustomEvent 用于监听自定义事件
+    # 注册自定义事件监听
     @CustomEvent('MyCustomEvent')
-    def onCustomEvent(self, ev):
-        # ev 是 ChainedEvent 实例
-        print('Custom event received: %s' % ev.eventType)
+    def onMyCustomEvent(self, event):
+        print('[MySystem] Custom event received:', event)
+
+    # 调度到 Tick 更新前
+    @Sched.Tick(SchedUpdateFlags.BeforeUpdate)
+    def beforeTick(self):
+        pass
+
+    # 广播事件到所有客户端
+    def broadcastMessage(self, msg):
+        self.sendAllClients('OnMessage', {'text': msg})
+
+    # 生成实体
+    def spawnNpc(self, template, pos, dim=0):
+        from architect.core import Location
+        loc = Location(pos, dim)
+        return self.spawnEntity(template, loc, (0, 0))
 ```
 
-### 7.2 ChainedEvent 链式事件
-
-`ChainedEvent` 是事件类，在 `EventChain.dispatch()` 内部自动创建。事件方法感知到的是 `ChainedEvent` 实例：
+### 5.2 客户端子系统
 
 ```python
-from architect.compact import ChainedEvent
+# subsystems/myClientSystem.py
+from architect.core import SubsystemClient, ClientSubsystem
+from architect.core import Sched, EventListener
 
-def eventHandler(ev):
-    # ev 是 ChainedEvent 实例
-    print(ev.eventType)     # 事件类型
-    print(ev.dict())        # 事件数据字典
-    ev.stop()               # 停止事件传递
-    ev.prevent()            # 阻止默认行为
-    ev.setEvent('key', 'value')  # 修改事件数据
+class MyClientSystem(ClientSubsystem):
+    canTick = True
+
+    def onInit(self):
+        print('[MySystem] Client initialized')
+
+    def onUpdate(self, dt):
+        """每 Tick 调用"""
+        pass
+
+    def onRender(self, dt):
+        """每渲染帧调用（仅客户端）"""
+        pass
+
+    @EventListener('OnMessage')
+    def onMessage(self, event):
+        print('[Client] Received:', event)
 ```
 
 ---
 
-## 8. 实体查询 (@Query + Sched)
+## 6. 使用装饰器注册子系统
 
-`@Query` 必须搭配 `Sched.Tick()`、`Sched.Render()` 等调度装饰器使用，否则不会执行。
+框架支持装饰器自动注册：
 
 ```python
-from architect.compact import Query, EntityId, ExtraArguments
-from architect.compact import SubsystemServer, ServerSubsystem
-from architect.compact import Sched
+from architect.core import SubsystemServer, ServerSubsystem
 
-@SubsystemServer
-class QuerySystem(ServerSubsystem):
+@SubsystemServer  # 自动注册到 SubsystemManager
+class MySystem(ServerSubsystem):
+    canTick = True
+```
 
-    # Query 必须与 Sched 装饰器配对使用
-    @Sched.Tick()
-    @Query(HealthCompServer)
-    def onQuery(self, comp):
-        # comp 是 HealthCompServer 实例
-        print('Health: %d' % comp.health)
+模块在 `MOD_SERVER_MODULES` 中被声明后会被 Import，装饰器在此时自动生效。
 
-    # 同时注入 entityId
-    @Sched.Tick()
-    @Query(HealthCompServer, EntityId)
-    def onQueryWithId(self, comp, entityId):
-        print('Entity %s has %d HP' % (entityId, comp.health))
+---
 
-    # 带额外参数
-    @Sched.Tick()
-    @Query(HealthCompServer, ExtraArguments)
-    def onQueryWithArgs(self, comp, args):
-        print('Extra args: %s' % str(args))
+## 7. 组件（Component）系统
 
-    # 使用 required/excluded 过滤
-    @Sched.Tick()
-    @Query(HealthCompServer, required=[AnotherComp], excluded=[BadComp])
-    def onFilteredQuery(self, comp):
+### 7.1 定义组件
+
+```python
+from architect.component import Component, PersistKeys
+from architect.component.schema import DefineFields, FieldSchema
+
+# 简单组件
+class Health(Component):
+    hp = 100
+    maxHp = 100
+
+# 带持久化的组件
+@PersistKeys('slots', 'selected')
+class Inventory(Component):
+    slots = [''] * 36
+    selected = 0
+
+# 带字段验证的组件
+@DefineFields({
+    'level': FieldSchema(default=1),
+    'xp': FieldSchema(default=0,
+                       validator=lambda v: v >= 0)
+})
+class PlayerStats(Component):
+    pass
+```
+
+### 7.2 创建和获取组件
+
+```python
+from architect.component import createComponent, getOrCreateComponent
+from architect.component import hasComponent, destroyComponent
+
+# 创建组件
+health = createComponent(entityId, Health)
+
+# 获取已有组件
+health = getOrCreateComponent(entityId, Health)
+health.hp -= 10
+
+# 检查组件是否存在
+if hasComponent(entityId, Health):
+    print('Entity has health')
+
+# 销毁组件
+destroyComponent(entityId, Health)
+```
+
+### 7.3 查询组件 — `@Query` 装饰器
+
+`@Query` 接收组件类作为位置参数，`required` 和 `excluded` 作为可选关键字参数。用 `EntityId` 伪组件获取实体 ID：
+
+```python
+from architect.query import Query, EntityId
+
+class PlayerDamageSystem(ServerSubsystem):
+    canTick = True
+
+    @Query(Health, EntityId,
+           required=[PlayerStats],
+           excluded=[Dead])
+    def damagePlayer(self, healthComp, entityId):
+        # healthComp: Health 组件实例
+        # entityId: 实体 ID (str)
+        # 注：required 中的 PlayerStats 仅用于筛选，不注入到参数
+        healthComp.hp = max(0, healthComp.hp - 5)
+
+    def onUpdate(self, dt):
+        self.damagePlayer()  # 遍历所有匹配实体
+```
+
+`@Query` 接受的参数：
+- `*compCls` — 位置参数，组件类列表，按顺序注入到方法参数中
+- `required=[...]` — 必须存在的额外组件（不注入到参数中）
+- `excluded=[...]` — 必须排除的组件
+
+伪组件 `EntityId` 用于获取实体 ID，放在参数列表的任意位置即可。
+
+---
+
+## 8. 事件系统
+
+### 8.1 监听引擎事件
+
+```python
+from architect.core import EventListener
+
+class MySystem(ServerSubsystem):
+    @EventListener('ServerPostInitEvent')
+    def onServerPostInit(self, event):
+        pass
+
+    @EventListener('EntityHurtEvent')
+    def onEntityHurt(self, event):
+        entityId = event['id']
+        cause = event['cause']
+        damage = event['damage']
+```
+
+### 8.2 自定义事件
+
+```python
+from architect.core import CustomEvent
+
+class MySystem(ClientSubsystem):
+    @CustomEvent('MyDataSyncEvent')
+    def onDataSync(self, event):
+        data = event['data']
+        print('Received:', data)
+```
+
+### 8.3 事件链 — `ChainedEvent`
+
+事件监听器接收一个 `ChainedEvent` 对象：
+
+```python
+@EventListener('EntityHurtEvent')
+def onEntityHurt(self, event):
+    entityId = event.id          # 属性访问 → 等价于 event['id']
+    damage = event.damage
+
+    if entityId == self.adminId:
+        event.stop()             # 停止事件向下传递
+        event.setEvent('damage', 0)  # 修改事件数据
+```
+
+### 8.4 `ChainedEvent` API
+
+| 方法 / 属性 | 说明 |
+|---|---|
+| `event.stop()` | 停止事件向下传递 |
+| `event.prevent()` | 设置 `cancel=True`（阻止默认行为） |
+| `event.setEvent(key, value)` | 修改事件属性 |
+| `event.updateEvent(dict)` | 批量更新事件属性 |
+| `event.dict()` | 获取事件的原始 dict |
+| `event.clone()` | 克隆事件副本 |
+| `event.<key>` | 通过属性访问事件字段 |
+
+---
+
+## 9. 调度系统 — `@Sched`
+
+```python
+from architect.core import Sched, SchedUpdateFlags
+
+class MySystem(ServerSubsystem):
+    # === Tick 调度 ===
+    @Sched.Tick()  # 默认在 Update 阶段
+    def onTickUpdate(self):
+        pass
+
+    @Sched.Tick(SchedUpdateFlags.BeforeUpdate)
+    def beforeTick(self):
+        pass
+
+    @Sched.Tick(SchedUpdateFlags.AfterUpdate)
+    def afterTick(self):
+        pass
+
+    # === 渲染帧调度（仅客户端） ===
+    @Sched.Render()
+    def onRender(self):
+        pass
+
+    # === 固定频率调度 ===
+    @Sched.Fixed('MyFixedSched')
+    def onFixedUpdate(self):
+        pass
+
+    def onReady(self):
+        self.scheduleFixed('MyFixedSched', period=0.5)  # 0.5 秒
+
+    # === 事件调度 ===
+    @Sched.Event('EntityHurtEvent')
+    def onEntityHurtSched(self):
         pass
 ```
 
 ---
 
-## 9. 远程调用 (RPC)
-
-使用 `@Remote` 装饰器和 `remote` 类。**只需要导入 `Remote` 和 `remote`**。
-
-### 9.1 服务端
+## 10. UI 系统
 
 ```python
-from architect.compact import Remote, remote
-from architect.compact import SubsystemServer, ServerSubsystem
+from architect.ui.client import UiSubsystem, UiDef, Sink, signal, Screen, AutoCreate, Hud
 
-@SubsystemServer
-class RpcSystem(ServerSubsystem):
-
-    @Remote
-    def serverGetPlayerName(self, playerId):
-        return 'Player_%s' % playerId[:8]
-
-    def someMethod(self):
-        # 发送给所有客户端
-        remote.client.callEvery('rpc_topic', {'data': 456})
-
-        # 发送给指定客户端
-        remote.client.call('player_id', 'rpc_topic', {'data': 123})
-```
-
-### 9.2 客户端
-
-```python
-from architect.compact import remote
-from architect.compact import SubsystemClient, ClientSubsystem
-
-@SubsystemClient
-class RpcClient(ClientSubsystem):
-
-    def onJoin(self):
-        # 调用服务端的 Remote 方法（无返回值）
-        remote.server.call('RpcSystem.serverGetPlayerName')
-
-        # 调用服务端的 Remote 方法并等待返回值
-        ftr = remote.server.invoke('RpcSystem.serverGetPlayerName')
-ftr.done(lambda name: print('Server says: %s' % name))
-```
-
----
-
-## 10. 响应式 UI
-
-```python
-from architect.compact import UiSubsystem, Screen, Hud, Sink, signal, AutoCreate
-
-uiDef = {
-    'type': 'stack_panel',
-    'size': ['100%', '100%'],
-    'controls': [
-        {
-            'label': 'health_text',
-            'type': 'label',
-            'text': 'Health: 100',
-            'pos': [0, 0],
-            'size': ['100%', 20]
-        },
-        {
-            'label': 'heal_btn',
-            'type': 'button',
-            'text': 'Heal',
-            'pos': [0, 30],
-            'size': [100, 20]
-        }
-    ]
-}
-
-@Screen
-@AutoCreate
-class MyScreen(UiSubsystem):
+@UiDef('myHud')      # 类装饰器：声明 UI 命名空间
+@Screen               # 类装饰器：标记为全屏界面
+@AutoCreate           # 类装饰器：自动创建
+class MyHUD(UiSubsystem):
+    canTick = True
 
     def onCreate(self):
-        # signal() 返回 (getter, setter) 元组
-        getHealth, setHealth = signal(100)
-        self.getHealth = getHealth
-        self.setHealth = setHealth
-        self.healthText = self.find('health_text')
-        print('UI Screen created')
+        """UI 创建时调用，等效于引擎 Create 事件"""
+        # signal 返回 (getter, setter) 元组
+        self.hpGet, self.hpSet = signal(100)
+        self.nameGet, self.nameSet = signal('Steve')
 
-    # @Sink 装饰器：自动追踪响应式依赖
-    @Sink
-    def updateHealthLabel(self):
-        health = self.getHealth()
-        self.healthText.asLabel().SetText('Health: %d' % health)
+        # 绑定控件
+        label = self.find('/hpLabel')
+        # ...
 
-    def onHeal(self):
-        newHealth = min(100, self.getHealth() + 20)
-        self.setHealth(newHealth)
-
-    def onDestroy(self):
-        print('UI Screen destroyed')
+    @Sink  # 方法装饰器：无参数，自动追踪内部访问的所有 signal
+    def refresh(self):
+        """任何 signal 变化时自动调用"""
+        hp = self.hpGet()
+        name = self.nameGet()
+        # 更新 UI 控件
+        self.find('/hpLabel').SetText(str(hp))
 ```
+
+**关键区别：** `signal()` 不是装饰器，返回 `(getter, setter)` 元组。`@Sink` 不带参数。`@UiDef`、`@Screen`、`@AutoCreate`、`@Hud` 都是类装饰器。
 
 ---
 
 ## 11. 插件系统
 
-```python
-from architect.compact import getPlugin, Plugin, PluginBase, hasPlugin
+### 11.1 内置插件
 
-# @Plugin 必须先调用以返回装饰器
-@Plugin('MyPlugin', [1, 0, 0], 'AuthorName', 'Description')
+框架内置了以下系统插件（`$vendor.*`）：
+
+| 插件名 | 说明 | 标识符 |
+|---|---|---|
+| 事件系统 | 事件封装和分发 | `$vendor.event` |
+| 动画扩展 | 动画序列和蒙太奇 | `$vendor.animation` |
+| 输入系统 | 键盘/鼠标输入映射 | `$vendor.input` |
+| 小队系统 | 实体分组管理 | `$vendor.squad` |
+
+### 11.2 启用插件
+
+```python
+PLUGINS = [
+    '$vendor.event',
+    '$vendor.animation',
+]
+```
+
+### 11.3 创建自定义插件
+
+```python
+# plugins/myPlugin.py
+from architect.core.loader import Plugin, PluginBase
+
+@Plugin(
+    name='MyPlugin',
+    ver=[1, 0, 0],
+    author='You',
+    desc='My first plugin',
+    deps={'RoninAnimationEx': '>=1.0.0'}
+)
 class MyPlugin(PluginBase):
+    def onCreate(self):
+        print('[MyPlugin] Created')
+
     def onAttach(self, manager):
-        pass
+        print('[MyPlugin] Attached')
 
     def onReady(self, manager):
-        pass
+        print('[MyPlugin] Ready')
 
-# 使用插件
-if hasPlugin('other_mod'):
-    plugin = getPlugin('other_mod')
-    plugin.someMethod()
+    def onDestroy(self):
+        print('[MyPlugin] Destroyed')
 ```
 
----
-
-## 12. 工具函数
+在 `conf.py` 中启用：
 
 ```python
-from architect.compact import isServer, levelId
-from architect.compact import Sched, defaultFilters
-
-if isServer():
-    print('Running on server')
-
-lid = levelId()
-print('Level ID: %s' % lid)
+PLUGINS = [
+    '$vendor.event',
+    '$user.myPlugin',   # 用户插件路径: {modname}.plugins.myPlugin
+]
 ```
 
 ---
 
-## 完整 API 对照
+## 12. 远程调用 (RPC)
 
-| 功能 | 导入来源 | `architect.compact` 支持 |
-|------|---------|:---:|
-| 子系统初始化 | `createServer()`, `createClient()`（无参数，读取 `conf.py`） | ✅ |
-| 子系统注册 | `@SubsystemServer`, `@SubsystemClient` | ✅ |
-| 子系统基类 | `ServerSubsystem`, `ClientSubsystem` | ✅ |
-| 调度装饰器 | `Sched.Tick()`, `Sched.Render()`, `Sched.Fixed()`, `Sched.Event()` | ✅ |
-| 组件定义 | `@Component()`, `BaseCompServer`, `BaseCompClient` | ✅ |
-| 组件操作 | `createComponent`, `getComponent`, `getEntities`, `hasComponent` | ✅ |
-| 原生组件常量 | `NeC`, `NeS`（仅常量名称，不可继承） | ✅ |
-| 事件监听 | `@EventListener`, `@CustomEvent`, `ChainedEvent` | ✅ |
-| 实体查询 | `@Query`（必须搭配 `@Sched.Tick()` 等使用） | ✅ |
-| 远程调用 | `@Remote`, `remote`（`remote.client`/`remote.server`） | ✅ |
-| UI 系统 | `UiSubsystem`, `@Screen`, `@Hud`, `@Sink`, `signal()` | ✅ |
-| 插件系统 | `@Plugin()`, `PluginBase`, `getPlugin`, `hasPlugin` | ✅ |
-| 工具 | `isServer`, `levelId`, `defaultFilters` | ✅ |
-| Future/异步 | `Future`, `Async` | ✅ |
-| 数学 | `architect.math.vec3`, `architect.math.mat4` | 通过子模块 |
+```python
+from architect.remote.common import Remote, remote
+
+class SyncSystem(ServerSubsystem):
+    @Remote
+    def syncPlayerData(self, callerPlayerId, targetId=None, data=None):
+        """被客户端远程调用时，第一个参数自动注入调用者的 playerId"""
+        return {'status': 'ok'}
+
+# === 客户端调用服务端 ===
+class ClientCaller(ClientSubsystem):
+    def onReady(self):
+        # 无需返回值（fire-and-forget）
+        remote.client.call('SyncSystem.syncPlayerData',
+                           targetId='player123',
+                           data={'hp': 100})
+
+        # 需要返回值（返回 Future）
+        fut = remote.client.invoke('SyncSystem.syncPlayerData',
+                                    targetId='player123',
+                                    data={'hp': 100})
+        fut.done(lambda result: print('Success:', result))
+        fut.expected(lambda err: print('Failed:', err))
+
+# === 服务端调用客户端 ===
+# remote.server.call(playerId, uri, *args, **kwargs)
+# remote.server.callEvery(uri, *args, **kwargs)  # 广播
+# remote.server.invoke(playerId, uri, *args, **kwargs)  # 需要返回值
+```
+
+---
+
+## 13. Aspect 面向切面编程
+
+```python
+from architect.core.aspect import Before, After, AfterReturning, AfterThrowing, Replace
+from architect.core.aspect import Aspect
+
+@Aspect(SomeTargetClass)  # 将切面绑定到目标类
+class MyAspect:
+    @Before('someMethod')
+    def beforeMethod(self, targetInst, args, kwargs):
+        print('Before:', args)
+
+    @After('someMethod')
+    def afterMethod(self, targetInst, args, kwargs):
+        print('After:', args)
+
+    @AfterReturning('someMethod')
+    def afterReturning(self, targetInst, returnVal, args, kwargs):
+        print('Returned:', returnVal)
+
+    @AfterThrowing('someMethod')
+    def afterThrowing(self, targetInst, e, args, kwargs):
+        print('Error:', e)
+
+    @Replace('someMethod')
+    def replaceMethod(self, targetInst, targetMethod, args, kwargs):
+        print('Intercepted!')
+        return targetMethod(targetInst, *args, **kwargs)
+```
+
+---
+
+## 14. CommandBus — 命令总线
+
+```python
+from architect.core.subsystem import SubsystemManager
+
+manager = SubsystemManager.getInstance()
+
+# 注册命令处理器
+def handleSpawn(template, location):
+    print('Spawning:', template, 'at', location)
+    return template
+
+unreg = manager.bus.register('spawnNpc', handleSpawn)
+
+# 执行命令（同步调用所有已注册的处理器）
+results = manager.bus.execute('spawnNpc', 'zombie', (0, 64, 0))
+
+# 注销
+unreg()
+```
+
+---
+
+## 15. Profiler 性能诊断
+
+```python
+from architect.core.profiler import profiler
+
+with profiler.record('myOperation'):
+    doHeavyWork()
+
+# 获取快照（不重置）
+snap = profiler.snapshot()
+# {'myOperation': {'avgMs': 1.2, 'maxMs': 3.4, 'count': 60}}
+
+# 获取快照并重置
+snap = profiler.flush()
+```
+
+---
+
+## 16. 统一导入入口 — `architect.compact`
+
+```python
+from architect.compact import *
+
+# 即可使用所有核心 API：
+# - SubsystemServer, SubsystemClient, ServerSubsystem, ClientSubsystem
+# - Sched, Future, Async, EventListener, CustomEvent
+# - Query, EntityId
+# - createComponent, getComponent, hasComponent
+# - LevelClient, LevelServer
+# - UiDef, Sink, signal, Screen
+# - AnnotationHelper
+# - Remote
+```
+
+---
+
+## 下一步
+
+- [架构设计 (architecture.md)](architecture.md) — 理解框架的分层设计和数据流
+- [子系统 (subsystem.md)](subsystem.md) — 深入子系统生命周期和通信
+- [组件系统 (ecs.md)](ecs.md) — 完整的 ECS 文档
+- [事件系统 (event.md)](event.md) — 事件 API 详解
+- [最佳实践 (best-practices.md)](best-practices.md) — 开发建议和常见陷阱

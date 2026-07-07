@@ -1,4 +1,6 @@
+# -*- coding: utf-8 -*-
 from ...core.export import ClientSubsystem, SubsystemClient
+from ...core.log import warn as _log_warn
 from ...component import BaseCompClient, Component, createComponent, getOneComponent
 from ...core.basic import compClient, clientApi
 from ...event import EventListener
@@ -105,6 +107,31 @@ PlayerDefaultClientDef = {
     },
 }
 
+
+class HandItemVisibility:
+    All = 0
+    OnlyFirstPerson = 1
+    OnlyThirdPerson = 2
+    Invisible = 3
+
+
+class RenderResources:
+    Geometries = 'geometry'
+    Materials = 'materials'
+    Textures = 'textures'
+    Animations = 'animations'
+    ParticleEffects = 'particle_effects'
+    SoundEffects = 'sound_effects'
+    RenderControllers = 'render_controllers'
+    Scripts = 'scripts'
+
+
+_HandItemVisibilityMapping = {
+    HandItemVisibility.All:             (True, 0),
+    HandItemVisibility.OnlyThirdPerson: (False, 2),
+    HandItemVisibility.OnlyFirstPerson: (False, 1),
+    HandItemVisibility.Invisible:       (False, 0)
+}
 
 @Component()
 class PersonaRendererComponent(BaseCompClient):
@@ -369,7 +396,7 @@ class PersonaRendererComponent(BaseCompClient):
             geometries = jsonObject.get("geometry")
             if geometries:
                 actorOverride["geometry"] = geometries
-                print('[WARN] Geometries should be preloaded before use.')
+                _log_warn('Geometries should be preloaded before use.')
                 for name, geometry in geometries.items():
                     self.actorRenderer.AddGeometryToOneActor(actorId, name, geometry)
 
@@ -377,7 +404,7 @@ class PersonaRendererComponent(BaseCompClient):
             textures = jsonObject.get("textures")
             if textures:
                 actorOverride["textures"] = textures
-                print('[WARN] Textures should be preloaded before use.')
+                _log_warn('Textures should be preloaded before use.')
                 for name, texture in textures.items():
                     self.actorRenderer.AddTextureToOneActor(actorId, name, texture)
 
@@ -385,14 +412,14 @@ class PersonaRendererComponent(BaseCompClient):
             particles = jsonObject.get("particle_effects")
             if particles:
                 actorOverride["particle_effects"] = particles
-                print('[WARN] Particle Effects should be preloaded before use.')
+                _log_warn('Particle Effects should be preloaded before use.')
                 for name, particle in particles.items():
                     self.actorRenderer.AddParticleEffectToOneActor(actorId, name, particle)
 
             #音效
             sounds = jsonObject.get('sound_effects')
             if sounds:
-                print('[WARN] Sound Effects should be preloaded before use.')
+                _log_warn('Sound Effects should be preloaded before use.')
                 for name, sound in sounds.items():
                     self.actorRenderer.AddSoundEffectToOneActor(actorId, name, sound)
 
@@ -465,7 +492,7 @@ class PersonaRendererComponent(BaseCompClient):
             geometries = jsonObject.get("geometry")
             if geometries:
                 overrideSnapshot["geometry"] = geometries
-                print('[WARN] Geometries should be preloaded before use.')
+                _log_warn('Geometries should be preloaded before use.')
                 for name, geometry in geometries.items():
                     overrideObj['geometry'].append(name)
                     self.actorRenderer.AddPlayerGeometry(name, geometry)
@@ -474,7 +501,7 @@ class PersonaRendererComponent(BaseCompClient):
             textures = jsonObject.get("textures")
             if textures:
                 overrideSnapshot["textures"] = textures
-                print('[WARN] Textures should be preloaded before use.')
+                _log_warn('Textures should be preloaded before use.')
                 for name, texture in textures.items():
                     self.actorRenderer.AddPlayerTexture(name, texture)
 
@@ -482,14 +509,14 @@ class PersonaRendererComponent(BaseCompClient):
             particles = jsonObject.get("particle_effects")
             if particles:
                 overrideSnapshot["particle_effects"] = particles
-                print('[WARN] Particle Effects should be preloaded before use.')
+                _log_warn('Particle Effects should be preloaded before use.')
                 for name, particle in particles.items():
                     self.actorRenderer.AddPlayerParticleEffect(name, particle)
 
             #音效
             sounds = jsonObject.get('sound_effects')
             if sounds:
-                print('[WARN] Sound Effects should be preloaded before use.')
+                _log_warn('Sound Effects should be preloaded before use.')
                 for name, sound in sounds.items():
                     self.actorRenderer.AddPlayerSoundEffect(name, sound)
 
@@ -540,10 +567,12 @@ class PersonaRendererComponent(BaseCompClient):
         if broadcast:
             self.broadcastRenderConf(overrideSnapshot)
 
-    def showHand(self, visible=True, mode=0):
+    def showHand(self, option=HandItemVisibility.All):
+        # type: (HandItemVisibility) -> None
+        visible, mode = _HandItemVisibilityMapping[option]
         self.actorRenderer.SetPlayerItemInHandVisible(visible, mode)
 
-    def changeRenderConf(self, jsonObject, broadcast=True, full=False):
+    def changeRenderConf(self, jsonObject, full=False, broadcast=True):
         if compClient.CreateEngineType(self.entityId).GetEngineType() == EntityType.Player:
             self.changePlayerRenderConf(jsonObject, full, broadcast)
         else:
@@ -602,9 +631,9 @@ class PersonaRendererComponent(BaseCompClient):
         """
         使用一个动画遮蔽玩家根动画，可以为空
         """
-        self.actorRenderer.AddPlayerScriptAnimate('root', '0')
+        self.actorRenderer.AddPlayerScriptAnimate('root', '0', True)
         if anim:
-            self.actorRenderer.AddPlayerScriptAnimate(anim, '1')
+            self.actorRenderer.AddPlayerScriptAnimate(anim, '1', True)
             self.shadowRoot = anim
         self.actorRenderer.RebuildPlayerRender()
 
@@ -613,7 +642,7 @@ class PersonaRendererComponent(BaseCompClient):
         self.actorRenderer.AddPlayerAnimationController('root', 'controller.animation.player.root')
         self.actorRenderer.AddPlayerScriptAnimate('root', '1', True)
         if shadowRoot:
-            self.actorRenderer.AddPlayerScriptAnimate(shadowRoot, '0')
+            self.actorRenderer.AddPlayerScriptAnimate(shadowRoot, '0', True)
             self.shadowRoot = None
         self.actorRenderer.RebuildPlayerRender()
 

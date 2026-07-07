@@ -45,7 +45,7 @@ SKILL_CONFIGS = [
         "default_key": 73,  # I键
         "ui_button_path": "/shadowPanel/shadow_ability/helmet_ability",
         "pc_key_label": "I",  # PC端显示按键
-        "cooldown": 5.0,
+        "cooldown": 10.0,
         "energy_cost": 20,
         # 新增：该技能可接受的物品列表
         "valid_items": [
@@ -55,8 +55,8 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "eruption",  # 使用 eruption 贴图
                 "server_commands": [
-                    "/playanimation @s animation.player.eruption",
-                    "/playsound mob.shulker.shoot @s"
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption"
                 ]
             },
             {
@@ -65,10 +65,90 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "eruption",  # 使用 eruption 贴图
                 "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
                     "/playanimation @s animation.player.eruption",
-                    "/playsound mob.shulker.shoot @s"
                 ]
-            }
+            },
+            {
+                "item_identifier": "sf:puppet",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:mind_protector",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:shadowdivers_muzzle",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:crested_cover",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:masters_beak",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:gaze_into_infinity",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:infinite_journey",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
+            {
+                "item_identifier": "sf:duality_hypothesis",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "eruption",  # 使用 eruption 贴图
+                "server_commands": [
+                    "/playsound shadow.ability.eruption @s",
+                    "/playanimation @s animation.player.eruption",
+                ]
+            },
         ]
     },
     {
@@ -77,7 +157,7 @@ SKILL_CONFIGS = [
         "default_key": 75,  # K键
         "ui_button_path": "/shadowPanel/shadow_ability/armor_ability",
         "pc_key_label": "K",  # PC端显示按键
-        "cooldown": 5.0,
+        "cooldown": 10.0,
         "energy_cost": 20,
         # 修改为valid_items格式
         "valid_items": [
@@ -87,9 +167,117 @@ SKILL_CONFIGS = [
                 "hotbar_slot": -1,
                 "texture_name": "blast",  # 原texture_name字段的值
                 "server_commands": [
+                    "/playsound shadow.ability.blast @s",
                     "/playanimation @s animation.player.blast",
                     "/camerashake add @s 2 0.1",
-                    "/playsound mob.shulker.shoot @s",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:heralds_raiment",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:forests_postmortem",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:agony_gleam",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:shadowdiving_suit",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:final_judgement",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:midnight_flight",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:demons_robe",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:council_of_seven",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
+                    "/execute as @s at @s run particle sf:blast"
+                ]
+            },
+            {
+                "item_identifier": "sf:shell_of_genesis",
+                "item_slot_type": "armor",
+                "hotbar_slot": -1,
+                "texture_name": "blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.blast @s",
+                    "/playanimation @s animation.player.blast",
+                    "/camerashake add @s 2 0.1",
                     "/execute as @s at @s run particle sf:blast"
                 ]
             }
@@ -101,7 +289,7 @@ SKILL_CONFIGS = [
         "default_key": 74,  # J键
         "ui_button_path": "/shadowPanel/shadow_ability/weapon_ability",
         "pc_key_label": "J",  # PC端显示按键
-        "cooldown": 5.0,
+        "cooldown": 10.0,
         "energy_cost": 20,
         # 修改为valid_items格式
         "valid_items": [
@@ -111,11 +299,28 @@ SKILL_CONFIGS = [
                 "hotbar_slot": 0,  # 快捷栏第1格
                 "texture_name": "shadow_onslaught",  # 原texture_name字段的值
                 "server_commands": [
-                    "/damage @e[r=3,type=!player] 30 entity_attack entity @s",
-                    "/playanimation @s animation.player.eruption",
-                    "/camerashake add @s 2 0.1",
-                    "/playsound mob.shulker.shoot @s",
-                    "/execute as @s at @s run particle sf:eruption"
+                    "/playsound shadow.ability.shadow_onslaught @s",
+                    "/playanimation @s animation.player.shadow_onslaught"
+                ]
+            },
+            {
+                "item_identifier": "sf:purple_peeler",
+                "item_slot_type": "hotbar",
+                "hotbar_slot": 0,  # 快捷栏第1格
+                "texture_name": "shadow_blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.windmill @s",
+                    "/playanimation @s animation.player.windmill"
+                ]
+            },
+            {
+                "item_identifier": "sf:fates_end",
+                "item_slot_type": "hotbar",
+                "hotbar_slot": 0,  # 快捷栏第1格
+                "texture_name": "shadow_blast",  # 原texture_name字段的值
+                "server_commands": [
+                    "/playsound shadow.ability.windmill @s",
+                    "/playanimation @s animation.player.windmill"
                 ]
             }
         ]
@@ -126,7 +331,7 @@ SKILL_CONFIGS = [
         "default_key": 76,  # L键
         "ui_button_path": "/shadowPanel/shadow_ability/rangedWeapon_ability",
         "pc_key_label": "L",  # PC端显示按键
-        "cooldown": 5.0,
+        "cooldown": 10.0,
         "energy_cost": 20,
         # 修改为valid_items格式
         "valid_items": [
@@ -136,7 +341,7 @@ SKILL_CONFIGS = [
                 "hotbar_slot": 1,  # 快捷栏第2格
                 "texture_name": "shadow_blast",  # 原texture_name字段的值
                 "server_commands": [
-                    "/playsound mob.shulker.shoot @s",
+                    "/playsound shadow.ability.shadow_blast @s",
                     "/playanimation @s animation.player.shadow_blast.particle none 0 \"0\" sf:s1",
                     "/playanimation @s animation.player.shadow_blast none 0 \"0\" sf:s2",
                 ]

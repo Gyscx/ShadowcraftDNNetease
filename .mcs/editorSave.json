@@ -20,9 +20,11 @@
                     "/main",
                     "/main/shadowPanel"
                 ],
+                "D:\\program\\ShadowcraftDNNetease\\resource_pack_5iay8wu8\\ui\\shadowEnergyEntity.json": [],
                 "D:\\program\\ShadowcraftDNNetease\\resource_pack_5iay8wu8\\ui\\shadow_energy.json": [
                     "/main",
                     "/main/shadowPanel",
+                    "/main/shadowPanel/progress_bar",
                     "/main/shadowPanel/shadow_ability",
                     "/main/shadowPanel/shadow_ability/helmet_ability",
                     "/main/shadowPanel/shadow_ability/helmet_ability/default",
@@ -30,6 +32,7 @@
                     "/main/shadowPanel/shadow_ability/armor_ability/default",
                     "/main/shadowPanel/shadow_ability/weapon_ability",
                     "/main/shadowPanel/shadow_ability/weapon_ability/default",
+                    "/main/shadowPanel/shadow_ability/weapon_ability/upgrade_button",
                     "/main/shadowPanel/shadow_ability/rangedWeapon_ability",
                     "/main/shadowPanel/shadow_ability/rangedWeapon_ability/default",
                     "/main/shadowPanel/upgrade_panel",

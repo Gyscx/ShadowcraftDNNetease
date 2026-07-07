@@ -1,0 +1,45 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation.player.shadow_onslaught": {
+			"animation_length": 1,
+			"override_previous_animation": true,
+			"bones": {
+				"root": {
+					"position": [0, -1, 0]
+				},
+				"waist": {
+					"rotation": [0, 0, 0],
+					"position": [0, 0, 0]
+				},
+				"body": {
+					"rotation": [0, -37.5, 0]
+				},
+				"head": {
+					"rotation": [0, 37.5, 0]
+				},
+				"leftArm": {
+					"rotation": [50, 0, 0]
+				},
+				"rightArm": {
+					"rotation": [-57.5, 0, 0]
+				},
+				"leftLeg": {
+					"rotation": [-40, 0, 0]
+				},
+				"rightLeg": {
+					"rotation": [30, 0, 0]
+				},
+				"loc2": {
+					"rotation": [0, 0, 0]
+				}
+			},
+			"particle_effects": {
+				"0.0": {
+					"effect": "shadow_onslaught",
+					"locator": "s2"
+				}
+			}
+		}
+	}
+}

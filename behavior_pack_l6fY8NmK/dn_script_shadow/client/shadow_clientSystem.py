@@ -11,8 +11,8 @@ CCF = clientApi.GetEngineCompFactory()
 levelId = clientApi.GetLevelId()
 notify_comp = CCF.CreateTextNotifyClient(levelId)
 config_comp = CCF.CreateConfigClient(levelId)
-damage_shadow = -0.10
-attack_shadow = -0.03
+damage_shadow = -0.06
+attack_shadow = -0.02
 playerId = clientApi.GetLocalPlayerId()
 
 @SubsystemClient
@@ -54,9 +54,6 @@ class ShadowClientSystem(ClientSubsystem):
                     if skill_id in ui_node.skill_states:
                         ui_node.skill_states[skill_id]["cooldown_time"] = new_time
 
-            # 更新UI冷却显示
-            ui_node.UpdateCooldowns()
-
             # 更新所有技能按钮状态
             for skill_cfg in config.SKILL_CONFIGS:
                 skill_id = skill_cfg["skill_id"]
@@ -65,6 +62,13 @@ class ShadowClientSystem(ClientSubsystem):
                 # 冷却结束后恢复默认状态
                 if cooldown_left <= 0.0:
                     ui_node.UpdateSkillButtonState(skill_id, has_item)
+                    # 隐藏cooldownImg
+                    button_path = skill_cfg.get("ui_button_path")
+                    if button_path:
+                        cooldown_img_path = button_path + "/cooldownImg"
+                        cooldown_img_ctrl = ui_node.GetBaseUIControl(cooldown_img_path)
+                        if cooldown_img_ctrl:
+                            cooldown_img_ctrl.SetVisible(False)
                 # 更新升级按钮可见性
                 ui_node.UpdateUpgradeButtonVisibility(skill_id)
 
@@ -134,7 +138,7 @@ class ShadowClientSystem(ClientSubsystem):
         return fragment_count >= fragment_cost
 
     def getFragmentCount(self):
-        """获取暗影碎片数量（苹果）"""
+        """获取暗影碎片数量"""
         item_comp = CCF.CreateItem(clientApi.GetLocalPlayerId())
         inv_pos = clientApi.GetMinecraftEnum().ItemPosType.INVENTORY
 
@@ -285,31 +289,59 @@ class ShadowClientSystem(ClientSubsystem):
         if not matched_item_config:
             return False
 
-        # 消耗能量
-        if ui_node.ConsumeShadowForAbility(skill_cfg["energy_cost"]):
-            # ... 原有的技能特效代码 ...
-            if skill_id == "RW" and matched_item_config["item_identifier"] == "minecraft:arrow":
-                render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
-                render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
-                render_comp.AddPlayerParticleEffect("shadow_blast", "sf:shadow_blast")
-                render_comp.RebuildPlayerRender()
-                time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
-                time_comp.AddTimer(2.0, self.ResetPlayerGeo)
+        # 检查能量是否足够（客户端预检查，最终由服务端决定）
+        current_data = config_comp.GetConfigData("dn_shadow_energy")
+        current_energy = current_data.get("shadow_data", 0) if current_data else 0
+        
+        if current_energy < skill_cfg["energy_cost"]:
+            comp = clientApi.GetEngineCompFactory().CreateTextNotifyClient(playerId)
+            # comp.SetLeftCornerNotify("暗影能量不足！无法释放技能！")
+            return False
+        
+        # ... 原有的技能特效代码 ...
+        if skill_id == "RW" and matched_item_config["item_identifier"] == "minecraft:arrow":
+            render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
+            render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
+            render_comp.AddPlayerParticleEffect("shadow_blast", "sf:shadow_blast")
+            render_comp.RebuildPlayerRender()
+            time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
+            time_comp.AddTimer(2.0, self.ResetPlayerGeo)
+        if skill_id == "weapon" and matched_item_config["item_identifier"] == "sf:world_slicer":
+            render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
+            render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
+            render_comp.AddPlayerParticleEffect("shadow_onslaught", "sf:shadow_onslaught")
+            render_comp.RebuildPlayerRender()
+            time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
+            time_comp.AddTimer(2.0, self.ResetPlayerGeo)
+        if skill_id == "weapon" and matched_item_config["item_identifier"] == "sf:fates_end":
+            render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
+            render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
+            render_comp.AddPlayerParticleEffect("shadow_smoke", "sf:shadow_smoke")
+            render_comp.RebuildPlayerRender()
+            time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
+            time_comp.AddTimer(2.0, self.ResetPlayerGeo)
+        if skill_id == "weapon" and matched_item_config["item_identifier"] == "sf:purple_peeler":
+            render_comp = clientApi.GetEngineCompFactory().CreateActorRender(playerId)
+            render_comp.AddPlayerGeometry("default", "geometry.dn.player.custom")
+            render_comp.AddPlayerParticleEffect("shadow_smoke", "sf:shadow_smoke")
+            render_comp.RebuildPlayerRender()
+            time_comp = clientApi.GetEngineCompFactory().CreateGame(levelId)
+            time_comp.AddTimer(2.0, self.ResetPlayerGeo)
+        
+        # 发送到服务端，传递伤害乘数（能量消耗由服务端处理）
+        self.sendServer(config.ServerSkillEvent, {
+            "skill": skill_id,
+            "playerId": clientApi.GetLocalPlayerId(),
+            "itemIdentifier": matched_item_config["item_identifier"],
+            "damageMultiplier": self.getDamageMultiplier(skill_id)
+        })
 
-            # 发送到服务端，传递伤害乘数
-            self.sendServer(config.ServerSkillEvent, {
-                "skill": skill_id,
-                "playerId": clientApi.GetLocalPlayerId(),
-                "itemIdentifier": matched_item_config["item_identifier"],
-                "damageMultiplier": self.getDamageMultiplier(skill_id)  # 新增：传递伤害乘数
-            })
-
-            # 设置冷却时间（使用实际冷却时间）
-            self.skill_cooldowns[skill_id] = actual_cooldown
-            if ui_node:
-                ui_node.StartCooldown(skill_id, actual_cooldown)
-            return True
-        return False
+        # 设置冷却时间（使用实际冷却时间）
+        self.skill_cooldowns[skill_id] = actual_cooldown
+        if ui_node:
+            ui_node.StartCooldown(skill_id, actual_cooldown)
+        
+        return True
 
     def ResetPlayerGeo(self):
         """重置玩家模型"""
@@ -340,9 +372,8 @@ class ShadowClientSystem(ClientSubsystem):
         for skill_cfg in config.SKILL_CONFIGS:
             mapped_key = playerViewComp.GetKeyMappings(skill_cfg["key_mapping_name"])
             if key == mapped_key and self.CheckItemForSkill(skill_cfg):
-                # 触发技能
-                if self.TriggerSkillAbility(skill_cfg["skill_id"]):
-                    ui_node.StartCooldown(skill_cfg["skill_id"])
+                # 触发技能（TriggerSkillAbility内部已调用StartCooldown）
+                self.TriggerSkillAbility(skill_cfg["skill_id"])
                 break
 
     @CustomEvent(config.ClientUpgradeSkillEvent)
@@ -373,9 +404,9 @@ class ShadowClientSystem(ClientSubsystem):
             print "Client: No existing data found, initialized with defaults:", shadowEnergyData
         else:
             print "Client: Loaded existing data:", shadowEnergyData
-            if shadowEnergyData.get("shadow_data", 0) >= 100:
+            if shadowEnergyData.get("shadow_data", 0) >= 20:
                 shadowEnergyData["is_full"] = True
-                shadowEnergyData["clip_ratio"] = 0.0
+                shadowEnergyData["clip_ratio"] = 1.0 - (shadowEnergyData.get("shadow_data", 0) / 100.0)
             else:
                 shadowEnergyData["is_full"] = False
                 shadowEnergyData["clip_ratio"] = 1.0 - (shadowEnergyData.get("shadow_data", 0) / 100.0)
@@ -709,7 +740,7 @@ class ShadowClientSystem(ClientSubsystem):
 
     @CustomEvent(config.AddShadowEnergyEvent)
     def OnAddShadowEnergy(self, args):
-        """增加暗影能量（服务端通知）"""
+        """增加暗影能量（服务端通知）- 兼容旧的增量更新方式"""
         print "收到暗影能量增加事件"
         print args.dict()
 
@@ -733,11 +764,11 @@ class ShadowClientSystem(ClientSubsystem):
         current_energy = current_data.get("shadow_data", 0)
         new_energy = current_energy + amount
         
-        # 确保能量值在0-100范围内，防止出现负数
+        # 确保能量值在0-100范围内，防止出现负数或超过上限
         if new_energy < 0:
             logger.warning("客户端：能量值计算为负数 (%s + %s = %s)，修正为0" % (current_energy, amount, new_energy))
             new_energy = 0
-        if new_energy > 100:
+        elif new_energy > 100:
             new_energy = 100
 
         new_ratio = 1.0 - (new_energy / 100.0)
@@ -772,7 +803,7 @@ class ShadowClientSystem(ClientSubsystem):
         # 能量已满：取消使用，物品不消耗
         if current_energy >= 100:
             args.cancel = True
-            notify_comp.SetLeftCornerNotify("客户端：暗影能量已满，无法使用该物品")
+            # notify_comp.SetLeftCornerNotify("客户端：暗影能量已满，无法使用该物品")
             return
         # 能量未满：取消原始事件，通知服务端处理物品消耗和能量增加
         args.cancel = True
@@ -914,14 +945,14 @@ class ShadowClientSystem(ClientSubsystem):
             # 显示升级成功消息
             level_text = "Lv" + str(new_level)
             damage_bonus = (damage_multiplier - 1.0) * 30
-            cooldown_reduction = float((1.0 - cooldown_multiplier) * 5)
+            cooldown_reduction = float((1.0 - cooldown_multiplier) * 10)
             print damage_bonus, cooldown_reduction
 
             current_damage = int(damage_multiplier * 30)
-            current_cooldown = float(cooldown_multiplier * 5)
+            current_cooldown = float(cooldown_multiplier * 10)
             print current_damage,current_cooldown
 
-            message = "§a%s技能升级到%s！§r" % (skill_id, level_text)
+            message = "§a升级技能成功！§r"
             if damage_bonus > 0:
                 message += " §a造成伤害: §l+%.1f§r (%d)" % (damage_bonus,current_damage)
             if cooldown_reduction > 0:

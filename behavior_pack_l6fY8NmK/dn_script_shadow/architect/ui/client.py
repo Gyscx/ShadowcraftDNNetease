@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from ..core.annotation import AnnotationHelper
 from ..conf import UI_DEF, UI_SINK, UI_NAMESPACE, UI_SCREEN, UI_HUD, UI_GESTURE
 from ..event import EventSignal, EventTarget
@@ -48,6 +49,9 @@ def UiDef(uiDef):
 
 
 def AutoCreate(cls):
+    """
+    在装饰器中应让AutoCreate处于最晚装饰（最上方）
+    """
     cls._handleAutoCreate()
     return cls
 

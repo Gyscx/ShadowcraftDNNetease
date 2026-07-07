@@ -1,187 +1,338 @@
-# 事件系统
+# Event — 事件系统
 
-`architect` 提供了一套灵活的事件系统，支持引擎原生事件和自定义事件的监听与广播。
+RoninNetease 事件系统在网易引擎原生事件机制基础上，提供了责任链模式、装饰器注册和强类型事件对象。
 
-## 架构概览
+---
 
-事件系统由以下核心组件构成：
+## 1. 架构概览
 
-- **`Delegate`**: 委托，封装单个可调用对象，通过 `bind`/`unbind`/`call` 管理
-- **`EventSignal`**: 事件信号，轻量级发布/订阅机制，支持 `on`/`off`/`emit`
-- **`EventTarget`**: 事件目标，提供 `addListener`/`removeListener`/`dispatch` 的事件管理基类
-- **`EventChain`**: 事件链，管理同一事件类型的多个监听器，支持捕获/冒泡顺序和中断
-- **`ChainedEvent`**: 链式事件对象，封装事件数据，支持 `stop()`/`prevent()` 等操作
-- **`EventListener`**: 装饰器，标记方法为事件监听器
-- **`CustomEvent`**: 装饰器，标记方法为自定义事件监听器
-
-## 事件信号 `EventSignal`
-
-`EventSignal` 是轻量级的信号/槽机制，可以作为属性装饰器使用：
-
-```python
-from architect.event import EventSignal
-
-signal = EventSignal()
-
-def handler():
-    print("Signal emitted!")
-
-# 监听信号
-signal.on(handler)
-
-# 触发信号
-signal.emit()
-
-# 取消监听
-signal.off(handler)
+```
+architect.event
+├── core.py          ← EventChain, ChainedEvent, EventSignal, EventTarget, Delegate
+├── client.py        ← 客户端事件注册表（EventChain 实例池）
+├── server.py        ← 服务端事件注册表
+└── events/
+    ├── player.py    ← 玩家相关事件
+    ├── entity.py    ← 实体相关事件
+    ├── block.py     ← 方块相关事件
+    ├── item.py      ← 物品相关事件
+    ├── world.py     ← 世界相关事件
+    ├── control.py   ← UI 控制事件
+    ├── interface.py ← UI 接口事件
+    ├── lobby.py     ← 大厅事件
+    ├── model.py     ← 模型相关事件
+    ├── physx.py     ← 物理相关事件
+    ├── setting.py   ← 设置相关事件
+    ├── sound.py     ← 音效事件
+    └── ui.py        ← UI 事件
 ```
 
-## 事件目标 `EventTarget`
+---
 
-`EventTarget` 提供封装的事件管理能力，适合作为基类使用：
+## 2. 核心类
+
+### 2.1 `ChainedEvent` — 事件对象
+
+框架对引擎原生事件的包装，提供了统一的访问和中断接口：
 
 ```python
-from architect.event import EventTarget
-
-class MyClass(EventTarget):
-    def __init__(self):
-        EventTarget.__init__(self)
-        self.addListener('SomeEvent', self.on_event)
-
-    def on_event(self, *args):
-        print("Event received:", args)
-
-    def cleanup(self):
-        self.removeAllListener()
+class ChainedEvent(object):
+    def __init__(self, eventType, data={}, interruptRef=Ref(None))
+    def stop()           # 停止事件传递
+    def prevent()        # 取消默认行为（设置 cancel=True, ret=True）
+    def setEvent(key, value)   # 修改事件字段
+    def updateEvent(dict)      # 批量更新字段
+    def dict()           # 获取内部 dict
+    def clone()          # 克隆事件副本
+    def __getattr__(name)  # 属性访问 → data[name]
 ```
 
-### EventTarget 方法
-
-- **`addListener(event, handler)`**: 监听事件
-- **`removeListener(event, handler)`**: 取消监听
-- **`removeAllListener()`**: 移除所有监听器
-- **`dispatch(event, *args)`**: 广播事件
-
-## 事件链 `EventChain`
-
-通过 `event()` 函数获取事件链实例：
+**使用示例：**
 
 ```python
-from architect.event.server import event as serverEvent
-from architect.event.client import event as clientEvent
+class MySystem(ServerSubsystem):
+    @EventListener('EntityHurtEvent')
+    def onEntityHurt(self, event):
+        # 属性式访问
+        entityId = event.id
+        damage = event.damage
+        source = event.srcId
 
-# 服务端事件链
-ev = serverEvent('PlayerJoinEvent')
+        # 修改事件
+        event.setEvent('damage', 0)
 
-# 自定义事件
-ev = clientEvent('MyCustomEvent', isCustomEvent=True)
+        # 停止传递
+        if entityId == self.protected_id:
+            event.stop()
+
+        # 取消默认行为
+        event.prevent()
+
+        # 获取原始 dict
+        raw = event.dict()
 ```
 
-### EventChain API
+### 2.2 `EventChain` — 事件链（责任链模式）
 
 ```python
-chain = event('EventName', isCustomEvent=False)
+class EventChain(Unreliable):
+    evType: str              # 事件类型名
+    guarded: bool = True     # 是否保护模式（前序监听器异常则中断）
+    useCapture: bool = False # 是否使用捕获模式
 
-# 添加监听器（冒泡顺序）
-chain.addListener(lambda ev: print("Event fired:", ev))
-
-# 添加监听器（捕获顺序）
-chain.capture(lambda ev: print("Capture:", ev))
-
-# 移除监听器
-fn = lambda ev: print("remove me")
-chain.addListener(fn)
-chain.removeListener(fn)
-
-# 分发事件（接收 dict 数据）
-chain.dispatch({"key": "value"})
-
-# 属性控制
-chain.guarded = True       # 出错后是否阻止后续监听器
-chain.useCapture = False   # True=添加顺序, False=反向顺序
+    def capture(fn)          # 添加捕获阶段监听器（先添加先执行）
+    def addListener(fn)      # 添加冒泡阶段监听器（先添加后执行）
+    def removeListener(fn)   # 移除监听器
+    def dispatch(_ev)        # 分发事件
 ```
 
-### 链式事件对象 `ChainedEvent`
+**执行顺序：**
+- `useCapture=False`（默认）→ 逆序遍历 handlers（冒泡模式，后添加先执行）
+- `useCapture=True` → 正序遍历 handlers（捕获模式，先添加先执行）
+- `guarded=True`（默认）→ 任何 handler 抛异常，跳过后续 handler
 
-事件分发时自动创建 `ChainedEvent` 实例并传入监听器：
+### 2.3 `EventSignal` — 信号（观察者模式）
 
 ```python
-def my_handler(ev):
-    print(ev.eventType)       # 事件类型名称
-    print(ev.dict())          # 事件数据字典
-
-    ev.stop()                 # 停止事件继续传递
-    ev.prevent()              # 阻止默认行为（设置 cancel=True）
-
-    ev.setEvent('key', 'val')  # 设置事件数据
-    ev.updateEvent({'a': 1})   # 批量更新事件数据
+class EventSignal(Unreliable):
+    def on(fn)           # 注册处理器
+    def off(fn)          # 注销处理器
+    def emit(*args)      # 触发所有处理器
 ```
 
-## 服务端/客户端事件管理器
+用于框架内部生命周期信号（`INITIALIZED`、`PRELOADED`）以及 Marker 的 `onEntityCreated`/`onEntityDestroyed`。
 
-### 服务端 `ServerEvents`
+### 2.4 `Delegate` — 单回调委托
 
 ```python
-from architect.event.server import ServerEvents
+class Delegate(Unreliable):
+    def bind(fn)         # 绑定函数
+    def call(*args)      # 调用
+    def unbind()         # 解绑
+    def __call__(*args)  # 可直接调用
+```
 
-chain = ServerEvents.getOrCreateChain('EventName', isCustomEvent=False)
+### 2.5 `EventTarget` — 命名事件目标
+
+```python
+class EventTarget(object):
+    def addListener(event, fn)    # 添加监听
+    def removeListener(event, fn) # 移除
+    def removeAllListener()       # 全部移除
+    def dispatch(event, *args)    # 触发事件
+```
+
+---
+
+## 3. 事件注册方式
+
+### 3.1 `@EventListener` 装饰器（引擎事件）
+
+```python
+from architect.core import EventListener
+
+class MySystem(ServerSubsystem):
+    @EventListener('ServerPostInitEvent')
+    def onServerPostInit(self, event):
+        """引擎事件，event 为 ChainedEvent"""
+        pass
+
+    @EventListener('EntityHurtEvent')
+    def onEntityHurt(self, event):
+        entityId = event.id
+        damage = event.damage
+```
+
+**装饰器签名：**
+
+```python
+def EventListener(eventType=None, isCustomEvent=False):
+    """
+    :param eventType: 事件类型字符串，None 则从默认事件类推断
+    :param isCustomEvent: True 时为自定义事件，注册到自定义事件通道
+    """
+```
+
+注册流程：
+1. `@EventListener` 在方法上标记 `_event_listener` 注解
+2. `Subsystem._init()` → `_addListeners()` 扫描所有带注解的方法
+3. 通过 `Subsystem._addListener()` 注册到引擎事件系统
+
+### 3.2 `@CustomEvent` 装饰器（自定义事件）
+
+```python
+from architect.core import CustomEvent
+
+class MySystem(ClientSubsystem):
+    @CustomEvent('MyDataSyncEvent')
+    def onDataSync(self, event):
+        data = event['data']
+        print('Received:', data)
+```
+
+`@CustomEvent` 是 `@EventListener(eventType, isCustomEvent=True)` 的别名。
+
+### 3.3 编程式注册
+
+```python
+class MySystem(ServerSubsystem):
+    def onInit(self):
+        # 自定义事件
+        self.on('MyEvent', self.onMyEvent, isCustomEvent=True)
+
+        # 引擎事件
+        self.listen('EntityHurtEvent', self.onEntityHurt)
+
+    def onMyEvent(self, event):
+        pass
+
+    def onDestroy(self):
+        # 注销
+        self.off('MyEvent', self.onMyEvent, isCustomEvent=True)
+        self.unlisten('EntityHurtEvent', self.onEntityHurt)
+```
+
+---
+
+## 4. 事件注册表 — `architect.event.client` / `architect.event.server`
+
+框架为每种引擎事件类型维护了 `EventChain` 单例：
+
+```python
+from architect.event import event as eventClient  # 客户端
+from architect.event import event as eventServer  # 服务端
+
+# event 是 __getattr__ 拦截器，返回对应事件类型的 EventChain
+chain = eventClient('EntityHurtEvent', isCustom=False)
 chain.addListener(my_handler)
 ```
 
-### 客户端 `ClientEvents`
+**`event` 对象的行为：**
+- `event(name, isCustom)` — 获取或创建事件类型的 `EventChain`
+- `event.has(name, isCustom)` — 检查事件类型是否已注册
+- 属性访问 `event.SomeEvent` — 等同于 `event('SomeEvent', False)`
+
+### 事件类型自动生成（可选）
+
+框架在 `architect/event/events/` 下提供了预定义事件类文件，每个文件定义事件类型类：
 
 ```python
-from architect.event.client import ClientEvents
+# architect/event/events/player.py
+class ServerPlayerDieEvent:
+    """玩家死亡事件"""
+    pass
 
-chain = ClientEvents.getOrCreateChain('EventName', isCustomEvent=True)
-chain.addListener(my_handler)
+class EntityHurtEvent:
+    """实体受伤事件"""
+    pass
 ```
 
-## 装饰器风格的事件监听
-
-### `@EventListener`
-
-标记方法接收引擎原生事件：
+`@EventListener` 不传参时，会从方法的**第一个非 self 参数的默认值**中提取事件类名：
 
 ```python
-from architect.event import EventListener
+from architect.event import events
 
-class MySystem(ServerSubsystem):
-    @EventListener('PlayerJoinEvent')
-    def on_player_join(self, ev):
-        print("Player joined:", ev)
+class BlockProtection(ServerSubsystem):
+    # 不传 eventType，从 ev 的默认值 events.EntityHurtEvent() 推断事件类型为 "EntityHurtEvent"
+    @EventListener()
+    def onEntityHurt(self, ev=events.EntityHurtEvent()):
+        targetId = ev.id
+        if self.isProtected(targetId):
+            ev.setEvent('damage', 0)
+            ev.prevent()
+
+    # 同样，自动推断为 "ServerPlayerDieEvent"
+    @EventListener()
+    def onPlayerDie(self, ev=events.ServerPlayerDieEvent()):
+        playerId = ev.id
+        self.dropInventory(playerId)
 ```
 
-### `@CustomEvent`
+> **注意：** 默认值必须是一个事件类实例。装饰器会调用 `default.__class__.__name__` 来获取事件类型字符串。如果方法的第一个非 self 参数没有默认值，或默认值为 `None`，会抛出 `ValueError`。
 
-标记方法接收自定义事件（等价于 `@EventListener(eventType, isCustomEvent=True)`）：
+---
 
-```python
-from architect.event import CustomEvent
+## 5. 事件分发流程
 
-class MySystem(ServerSubsystem):
-    @CustomEvent('MyCustomEvent')
-    def on_my_event(self, ev):
-        print("Custom event received:", ev)
+```
+引擎事件触发
+    │
+    ▼
+SubsystemManager.addListener() 或 Subsystem.on()
+    │  调用 system.ListenForEvent(engine, sysName, eventType, listener, fn)
+    │
+    ▼
+EventChain.dispatch(eventData)
+    ├── 创建 ChainedEvent(eventType, eventData, interruptRef=Ref(None))
+    ├── 按 capture/bubble 顺序遍历 handlers
+    │   └── tryCall(handler, ChainedEvent)
+    │       ├── handler 内调用 event.stop()
+    │       │   → interruptRef.value = True → 中断后续 handler
+    │       └── handler 内调用 event.prevent()
+    │           → eventData['cancel'] = True
+    │
+    └── guarded=True 时，tryCall 捕获异常 → 停止传递
 ```
 
-## 委托 `Delegate`
+---
 
-`Delegate` 封装单个可调用对象，不安全地处理异常：
+## 6. `EventSignal` 使用（生命周期信号）
 
 ```python
-from architect.event import Delegate
+from architect.core.subsystem import SubsystemManager
 
-del = Delegate()
+manager = SubsystemManager.getInstance()
 
-def my_fn(*args):
-    print("Called with:", args)
+# 监听初始化完成
+manager.INITIALIZED.on(lambda: print('Plugins loaded'))
 
-# 绑定
-del.bind(my_fn)
+# 监听预加载完成
+manager.PRELOADED.on(lambda: print('All subsystems ready'))
 
-# 调用
-del("hello")  # 或 del.call("hello")
+# 注销
+manager.INITIALIZED.off(callback)
+```
 
-# 解绑
-del.unbind()
+---
+
+## 7. 与 `@Sched.Event` 的区别
+
+- `@EventListener` / `@CustomEvent` — 替换 `onUpdate` 等钩子，在事件发生时执行回调，回调接收 `ChainedEvent` 参数
+- `@Sched.Event` — 调度器事件，在事件发生时将方法加入调度队列执行，**不接收**事件参数（事件数据通过 `EventReader` 组件获取）
+
+```python
+# 事件监听器（接收 ChainedEvent）
+@EventListener('EntityHurtEvent')
+def onHurt(self, event):
+    target = event.id
+    damage = event.damage
+
+# 事件调度器（不接收参数，通过 EventReader 获取）
+@Sched.Event('EntityHurtEvent')
+def onHurtSched(self):
+    reader = getComponent(self.entityId, EventReader)
+    event = reader.ev
+    target = event['id']
+```
+
+---
+
+## 8. 最佳实践
+
+1. **使用装饰器注册**，避免在 `onInit` 中手动调用 `self.on()`
+2. **使用 `ChainedEvent` 属性访问**，它比 dict 访问更易读：
+   ```python
+   event.id  # 推荐
+   event['id']  # 也支持
+   ```
+3. **在不需要中断事件流时不要调用 `stop()` 或 `prevent()`**
+4. **自定义事件名称使用语义化前缀**，如 `OnPlayerLevelUp` 而非 `Ev1`
+5. **客户端和服务端事件是分离的**，`@EventListener` 在服务端子系统中只监听服务端事件
+
+---
+
+## 下一步
+
+- [调度系统 (scheduler.md)](scheduler.md) — 调度器完整 API
+- [子系统 (subsystem.md)](subsystem.md) — 子系统生命周期
+- [UI 系统 (ui.md)](ui.md) — 响应式 UI 数据绑定

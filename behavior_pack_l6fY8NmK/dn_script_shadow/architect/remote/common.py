@@ -1,5 +1,19 @@
+# coding=utf-8
+"""
+引擎约束说明 (Engine Constraint Notes)
+
+1. 远程调用（RPC）基于网易引擎的 sendServer / sendClient 事件通道实现。
+   _RemoteClient.invoke() 和 _RemoteServer.invoke() 使用引擎级定时器
+   （LevelClient.game.AddTimer / LevelServer.game.AddTimer）实现 3 秒超时。
+
+2. if 1 > 2: from ..core.subsystem import SubsystemManager 是
+   Python 2.7 缺少 typing 的类型提示变通方案（与 component/core.py 同理）。
+
+3. DataTable 的序列化/反序列化通过 ImportModule 动态加载类，依赖引擎的模块导入机制。
+"""
 from ..core.basic import isServer, serverApi, clientApi
 from ..core.scheduler import Future
+from ..core.log import error as _log_error
 from ..level.server import LevelServer
 from ..level.client import LevelClient
 from ..core.annotation import AnnotationHelper
@@ -11,13 +25,26 @@ if 1 > 2:
 REMOTE_CALL_KEY = '[[remote_call]]'
 REMOTE_RET_KEY = '[[remote_ret]]'
 REMOTE_INNER_KEY = '[[remote_inner]]'
+REMOTE_VALIDATE_KEY = '[[remote_validate]]'
+
+# RPC 调用超时（秒），可按需通过 modConf 热更
+RPC_TIMEOUT = 3
 
 
-def Remote(method):
+def Remote(method=None, **validate_types):
     """
     装饰器被应用在服务器子系统的方法上时, 会往参数列表第一个添加客户端的playerId
     """
+    if method is None:
+        def decorator(fn):
+            AnnotationHelper.addAnnotation(fn, REMOTE_INNER_KEY, True)
+            if validate_types:
+                AnnotationHelper.addAnnotation(fn, REMOTE_VALIDATE_KEY, validate_types)
+            return fn
+        return decorator
     AnnotationHelper.addAnnotation(method, REMOTE_INNER_KEY, True)
+    if validate_types:
+        AnnotationHelper.addAnnotation(method, REMOTE_VALIDATE_KEY, validate_types)
     return method
 
 
@@ -103,6 +130,36 @@ def _createInvokeData(id, uri, *args, **kwargs):
     }
 
 
+def _validateRemoteArgs(uri, args, kwargs):
+    if not isServer():
+        return
+    methods = _serverRemoteMethods
+    fn = methods.get(uri)
+    if fn is None:
+        return
+    import inspect
+    validators = AnnotationHelper.getAnnotation(fn, REMOTE_VALIDATE_KEY)
+    if validators is None:
+        return
+    try:
+        spec = inspect.getargspec(fn)
+    except Exception:
+        return
+    arg_names = spec.args[2:]
+    for i2,v in enumerate(args):
+        if i2<len(arg_names):
+            n=arg_names[i2];ch=validators.get(n)
+            if ch:
+                try: ok=ch(v)
+                except: ok=False
+                if not ok: raise ValueError("Remote arg %s=%r failed"%(n,v))
+    for n,v in kwargs.items():
+        ch=validators.get(n)
+        if ch:
+            try: ok=ch(v)
+            except: ok=False
+            if not ok: raise ValueError("Remote arg %s=%r failed"%(n,v))
+
 def _callRemoteMethod(subsys, data):
     id = data['id']
     uri = data['uri']
@@ -127,6 +184,7 @@ def _callRemoteMethod(subsys, data):
             kwargs[key] = value
 
     try:
+        _validateRemoteArgs(uri, args, kwargs)
         if isServer():
             result = _serverRemoteMethods[uri](data['__id__'], *args, **kwargs)
         else:
@@ -134,7 +192,7 @@ def _callRemoteMethod(subsys, data):
     except Exception as e:
         err = e
         import traceback
-        print('[ERROR] Remote call failed: \n' + traceback.format_exc())
+        _log_error(traceback.format_exc())
 
     if requireReturn:
         def _sendReturn(result, err, id=id):
@@ -216,7 +274,7 @@ class _RemoteClient(object):
         def _timeout():
             del _clientRets[retId]
             reject('timeout')
-        timer = LevelClient.getInstance().game.AddTimer(3, _timeout) # type: ignore
+        timer = LevelClient.getInstance().game.AddTimer(RPC_TIMEOUT, _timeout) # type: ignore
 
         def _recieveReturn(result, err):
             LevelClient.getInstance().game.CancelTimer(timer)
@@ -266,7 +324,7 @@ class _RemoteServer(object):
             del _serverRets[retId]
             reject('timeout')
 
-        timer = LevelServer.game.AddTimer(3, _timeout) # type: ignore
+        timer = LevelServer.game.AddTimer(RPC_TIMEOUT, _timeout) # type: ignore
 
         def _recieveReturn(result, err):
             LevelServer.game.CancelTimer(timer)

@@ -33,7 +33,6 @@ class InputSubsystem(ClientSubsystem):
         for skill_cfg in config.SKILL_CONFIGS:
             mapped_key = playerViewComp.GetKeyMappings(skill_cfg["key_mapping_name"])
             if key == mapped_key and self.CheckItemForSkill(skill_cfg):
-                # 触发技能
-                if self.TriggerSkillAbility(skill_cfg["skill_id"]):
-                    ui_node.StartCooldown(skill_cfg["skill_id"])
+                # 触发技能（TriggerSkillAbility内部已调用StartCooldown）
+                self.TriggerSkillAbility(skill_cfg["skill_id"])
                 break

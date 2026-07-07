@@ -248,6 +248,18 @@
                                                             }
                                                         ]
                                                     }
+                                                },
+                                                {
+                                                    "cooldownImg": {
+                                                        "type": "image",
+                                                        "size": [
+                                                            29.0,
+                                                            29.0
+                                                        ],
+                                                        "layer": 50,
+                                                        "clip_direction": "down",
+                                                        "texture": ""
+                                                    }
                                                 }
                                             ]
                                         }
@@ -426,6 +438,18 @@
                                                                 "binding_name": "#armor_level_text"
                                                             }
                                                         ]
+                                                    }
+                                                },
+                                                {
+                                                    "cooldownImg": {
+                                                        "type": "image",
+                                                        "size": [
+                                                            29.0,
+                                                            29.0
+                                                        ],
+                                                        "layer": 50,
+                                                        "clip_direction": "down",
+                                                        "texture": ""
                                                     }
                                                 }
                                             ]
@@ -606,6 +630,18 @@
                                                             }
                                                         ]
                                                     }
+                                                },
+                                                {
+                                                    "cooldownImg": {
+                                                        "type": "image",
+                                                        "size": [
+                                                            29.0,
+                                                            29.0
+                                                        ],
+                                                        "layer": 50,
+                                                        "clip_direction": "down",
+                                                        "texture": ""
+                                                    }
                                                 }
                                             ]
                                         }
@@ -784,6 +820,18 @@
                                                                 "binding_name": "#RW_level_text"
                                                             }
                                                         ]
+                                                    }
+                                                },
+                                                {
+                                                    "cooldownImg": {
+                                                        "type": "image",
+                                                        "size": [
+                                                            29.0,
+                                                            29.0
+                                                        ],
+                                                        "layer": 50,
+                                                        "clip_direction": "down",
+                                                        "texture": ""
                                                     }
                                                 }
                                             ]

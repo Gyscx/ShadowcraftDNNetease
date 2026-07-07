@@ -1,0 +1,89 @@
+{
+    "format_version": "1.10.0",
+    "animation_controllers": {
+        "controller.animation.dn.player.katana.controller": {
+            "initial_state": "default",
+            "states": {
+                "default": {
+                    "transitions": [
+                        {
+                            "chasing": "q.is_moving && q.has_target"
+                        },
+                        {
+                            "idle": "!q.is_moving && !q.has_target"
+                        }
+                    ],
+                    "blend_transition": 0.3
+                },
+                "idle": {
+                    "animations": [
+                        "katana.idle"
+                    ],
+                    "transitions": [
+                        {
+                            "chasing": "q.is_moving && q.has_target"
+                        },
+                        {
+                            "default": "q.is_moving && !q.has_target"
+                        }
+                    ],
+                    "blend_transition": 0.3
+                },
+                "chasing": {
+                    "animations": [
+                        "katana.chasing"
+                    ],
+                    "transitions": [
+                        {
+                            "attack_1": "v.attack_time >= 0.5 && q.any_animation_finished"
+                        },
+                        {
+                            "default": "q.is_moving && !q.has_target"
+                        }
+                    ],
+                    "blend_transition": 0.3
+                },
+                "attack_1": {
+                    "animations": [
+                        "katana.attack1"
+                    ],
+                    "transitions": [
+                        {
+                            "attack_2": "v.attack_time >= 0.5 && q.any_animation_finished"
+                        },
+                        {
+                            "chasing": "q.is_moving && q.has_target && q.any_animation_finished"
+                        },
+                        {
+                            "idle": "!q.is_moving && !q.has_target"
+                        },
+                        {
+                            "default": "q.is_moving && !q.has_target"
+                        }
+                    ],
+                    "blend_transition": 0.3
+                },
+                "attack_2": {
+                    "animations": [
+                        "katana.attack2"
+                    ],
+                    "transitions": [
+                        {
+                            "attack_1": "v.attack_time >= 0.5 && q.any_animation_finished"
+                        },
+                        {
+                            "chasing": "q.is_moving && q.has_target && q.any_animation_finished"
+                        },
+                        {
+                            "idle": "!q.is_moving && !q.has_target"
+                        },
+                        {
+                            "default": "q.is_moving && !q.has_target"
+                        }
+                    ],
+                    "blend_transition": 0.3
+                }
+            }
+        }
+    }
+}

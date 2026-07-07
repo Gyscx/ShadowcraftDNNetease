@@ -1,18 +1,33 @@
+# coding=utf-8
+__all__ = [
+    'Internal',
+    'SubsystemManager',
+    'ServerSubsystem',
+    'ClientSubsystem',
+    'subsystem',
+]
+
 import time
 
-import mod.client.extraClientApi as clientApi
-import mod.server.extraServerApi as serverApi
-
 from .annotation import AnnotationHelper
+from .bus import CommandBus
 from .scheduler import Scheduler, Sched, SimpleFixedScheduler
-from .basic import isServer, Location
+from .basic import isServer, Location, clientApi, serverApi
 from .configurator import modConf, __modname__
 
 from ..component.core import _registerCompsIntoGame, getOrCreateSingletonComponent
 from ..event.core import EventSignal
 from ..event.client import event as eventClient
 from ..event.server import event as eventServer
-from ..conf import EVENT_LISTENER, CUSTOM_EVENT, SYSTEM_SCHED_ANNO, SCHED_EVENT
+from ..conf import EVENT_LISTENER, CUSTOM_EVENT, SYSTEM_SCHED_ANNO, SCHED_EVENT, INTERNAL_METHOD
+
+from .profiler import profiler
+from .log import info as _log_info
+
+def Internal(method):
+    from .annotation import AnnotationHelper
+    AnnotationHelper.addAnnotation(method, INTERNAL_METHOD, True)
+    return method
 
 from .typeHelper import castTo
 
@@ -45,6 +60,7 @@ class SubsystemManager(object):
         # 在manager之前初始化，否则无法监听组件注册和子系统变更
         self.rawEngine = clientApi.GetEngineNamespace()
         self.rawSysName = clientApi.GetEngineSystemName()
+        self._initRemoteCalls()
         self._initManager(False)
         return self
 
@@ -52,6 +68,7 @@ class SubsystemManager(object):
     def createServer(self):
         self.rawEngine = serverApi.GetEngineNamespace()
         self.rawSysName = serverApi.GetEngineSystemName()
+        self._initRemoteCalls()
         listener = EventListener('LoadServerAddonScriptsAfter', lambda _: self._initManager(True))
         self.system.ListenForEvent(
             self.rawEngine,
@@ -75,10 +92,18 @@ class SubsystemManager(object):
         self.rawSysName = None
         self.subsystems = {}
         self.listeners = []
+        self.bus = CommandBus()
         self.renderSched = Scheduler()
         self.tickSched = Scheduler()
+        self._remoteCallsReady = False
+
+    def _initRemoteCalls(self):
+        """初始化远程调用监听器（在 createServer/createClient 流程中显式调用）。"""
+        if self._remoteCallsReady:
+            return
         from ..remote.common import _registerRemoteCalls
         _registerRemoteCalls(self)
+        self._remoteCallsReady = True
 
 
     def _record(self, inst):
@@ -148,7 +173,7 @@ class SubsystemManager(object):
     def addSubsystem(self, subsystemCls):
         subSys = subsystemCls(self.system, self.engine, self.sysName)
         subSys._init()
-        print('[INFO] {} Subsystem "{}" has been initialized'.format('Server' if isServer() else 'Client', subSys.__class__.__name__))
+        _log_info('{} Subsystem "{}" has been initialized', 'Server' if isServer() else 'Client', subSys.__class__.__name__)
         if isServer():
             subsystem._firstSubsysServer = subSys
         else:
@@ -196,7 +221,8 @@ class SubsystemManager(object):
                 obj.ticks += 1
 
         self.lastTickTimeServer = currentTime
-        self.tickSched.executeSequence()
+        _skipped = self.tickSched.executeSequence()[1]
+        profiler._add('scheduler.tickSkipped', float(_skipped))
 
 
     def tickRender(self, _):
@@ -208,7 +234,8 @@ class SubsystemManager(object):
             if obj.canTick:
                 obj.onRender(dt)
 
-        self.renderSched.executeSequence()
+        _rskipped = self.renderSched.executeSequence()[1]
+        profiler._add('scheduler.renderSkipped', float(_rskipped))
 
 
     def addListener(self, event, fn, isCustomEvent=False):
@@ -425,9 +452,25 @@ class Subsystem(object):
         self._fixedSchedsToAdd = {} # type: dict[str, list]
         self._schedEvents = {} # type: dict[tuple, tuple[list[function], list[function]]]
         self.fixedSchedulers = {} # type: dict[str, SimpleFixedScheduler]
-        self._addListeners()
-        self._addSchedMethods()
-        self._registerRemoteFuncs()
+        try:
+            self._addListeners()
+            self._addSchedMethods()
+            self._registerRemoteFuncs()
+        except Exception:
+            try:
+                self._removeListeners()
+            except Exception:
+                pass
+            try:
+                self._removeSchedMethods()
+            except Exception:
+                pass
+            try:
+                self._removeRemoteFuncs()
+            except KeyError:
+                pass
+            SubsystemManager.getInstance()._removeRecord(self) # type: ignore
+            raise
         self.onInit()
         self.initialized = True
 
@@ -537,6 +580,17 @@ class _ShadowSystemClient(ClientSystem):
 
 
 class subsystem:
+    """
+    静态工具类，代理「第一个注册的子系统」的常用通信和生成方法。
+
+    在模组中未显式保存子系统引用时，可通过 subsystem.sendServer() /
+    subsystem.sendClient() / subsystem.spawnEntity() 等静态方法
+    直接调用。内部通过 _findFirstSubsystem() 定位 SubsystemManager
+    添加的第一个 ServerSubsystem 或 ClientSubsystem 实例。
+
+    如需精确控制（多个子系统并存），请使用 SubsystemManager.getInstance()
+    获取管理器后调用 getSubsystem(YourSystem) 获得目标实例。
+    """
 
     _firstSubsysClient = None # type: ClientSubsystem
     _firstSubsysServer = None # type: ServerSubsystem
