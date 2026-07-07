@@ -5,9 +5,9 @@ import random
 from mod_log import logger
 from .. import config
 
-from ..architect.compact import ServerSubsystem, SubsystemServer
-from ..architect.compact import EventListener, CustomEvent
-from ..architect.fsm.stateTree.common import StateTree, StateNode
+from ..engine.architect.compact import ServerSubsystem, SubsystemServer
+from ..engine.architect.compact import EventListener, CustomEvent
+from ..engine.architect.fsm.stateTree.common import StateTree, StateNode
 
 SS = serverApi.GetServerSystemCls()
 SCF = serverApi.GetEngineCompFactory()
