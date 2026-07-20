@@ -3,8 +3,8 @@ import mod.client.extraClientApi as clientApi
 from .. import config
 from mod_log import logger
 
-from ..architect.compact import ClientSubsystem, SubsystemClient
-from ..architect.compact import EventListener, CustomEvent
+from ..engine.architect.compact import ClientSubsystem, SubsystemClient
+from ..engine.architect.compact import EventListener, CustomEvent
 
 CS = clientApi.GetClientSystemCls()
 CCF = clientApi.GetEngineCompFactory()
