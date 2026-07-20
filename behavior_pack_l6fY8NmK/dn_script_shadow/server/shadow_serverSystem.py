@@ -1136,7 +1136,7 @@ class ShadowServerSystem(ServerSubsystem):
             monster_skill_ids = ["helmet", "armor", "weapon", "RW"]
 
             for skill_id in monster_skill_ids:
-                if random.random() < 0.5:
+                if random.random() < 0.5:  # 50%概率尝试释放技能
                     tree.mapping['skill_id'] = skill_id
                     tree.mapping['target_id'] = target_player_id
                     tree.finishTasks()
