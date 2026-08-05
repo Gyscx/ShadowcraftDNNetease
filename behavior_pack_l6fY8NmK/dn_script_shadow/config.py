@@ -29,12 +29,18 @@ RequestEntityShadowDataEvent = "RequestEntityShadowDataEvent"  # 客户端->服�
 ResponseEntityShadowDataEvent = "ResponseEntityShadowDataEvent"  # 服务器->客户端：响应实体数据
 PlayerShadowEffectEvent = "PlayerShadowEffectEvent"  # 服务器->客户端：玩家特殊效果（抑制/充能）
 SetPlayerShadowEnergyEvent = "SetPlayerShadowEnergyEvent"  # 服务器->客户端：设置玩家暗影能量值
+ShadowSystemCommandEvent = "ShadowSystemCommandEvent"  # 命令事件：设置暗影能量
 
 shadowUIName = "shadow_energy"
-shadowEntityUIName = "shadowEnergyEntity"
 shadowUIPyClsPath = "dn_script_shadow.ui.shadowUI.ShadowScreenUI"
-shadowEntityUIPyClsPath = "dn_script_shadow.ui.shadowEntityUI.ShadowEntityScreenUI"
 shadowUIScreenDef = "shadow_energy.main"
+
+healthbarUIName = "custom_healthbar"
+healthbarUIPyClsPath = "dn_script_shadow.ui.CustomHealthBar.healthbar"
+healthbarUIScreenDef = "custom_healthbar.main"
+
+shadowEntityUIName = "shadowEnergyEntity"
+shadowEntityUIPyClsPath = "dn_script_shadow.ui.shadowEntityUI.ShadowEntityScreenUI"
 shadowEntityUIScreenDef = "shadowEnergyEntity.main"
 
 # 技能配置列表 - 核心数据结构

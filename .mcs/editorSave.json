@@ -3,7 +3,100 @@
         "EnchantSetting": {
             "amplifier": 1
         },
-        "PackResourceSortData": {},
+        "PackResourceSortData": {
+            "1_sf:man_common_h": {
+                "createTime": 1785911427.500754,
+                "modifyTime": 1785911427.500754
+            },
+            "1_sf:man_epic_h": {
+                "createTime": 1785911427.500754,
+                "modifyTime": 1785911427.500754
+            },
+            "1_sf:man_legendary_h": {
+                "createTime": 1785911427.500754,
+                "modifyTime": 1785911427.500754
+            },
+            "1_sf:man_unique_h": {
+                "createTime": 1785911427.500754,
+                "modifyTime": 1785911925.983539
+            },
+            "1_sf:shadow_dampener_splash_potion_projectile": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "1_sf:shadowball_eruption": {
+                "createTime": 1785911427.500754,
+                "modifyTime": 1785911427.500754
+            },
+            "2_sf:shadow_dampener": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "2_sf:shadow_dampener_powder": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "2_sf:shadow_dampener_splash_potion": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "2_sf:shadow_energy": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "2_sf:shadow_overcharger": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "32768_sound_definitions": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "32_entities/commonH": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "32_entities/epicH": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "32_entities/legendaryH": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "32_entities/uniqueH": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "4096_sf:shadow_dampener_effect": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "4096_sf:shadow_overcharger_effect": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "4194304_shadow_system": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "8_sf:shadow_dampener_powder_recipe": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "8_sf:shadow_dampener_recipe": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "8_sf:shadow_dampener_splash_potion_recipe": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            },
+            "8_sf:shadow_overcharger_recipe": {
+                "createTime": 1785911427.5017636,
+                "modifyTime": 1785911427.5017636
+            }
+        },
         "PlayerEffectSetting": {
             "amplifier": 1,
             "duration": 10

@@ -4,7 +4,6 @@ sf:shadow_dampener_effect=暗影抑制
 sf:shadow_overcharger_effect=暗影充能
 item.sf:shadow_dampener_splash_potion.name=可喷溅的暗影抑制剂
 item.sf:shadow_dampener_powder.name=暗影抑制粉末
-
 entity.sf:man_common_H.name=暗鸦斥候
 item.spawn_egg.entity.sf:man_common_H.name=暗鸦斥候生成蛋
 entity.sf:man_epic_H.name=隐匿武士
@@ -13,3 +12,5 @@ entity.sf:man_legendary_H.name=圆顶守护者
 item.spawn_egg.entity.sf:man_legendary_H.name=圆顶守护者生成蛋
 entity.sf:man_unique_H.name=世界之主
 item.spawn_egg.entity.sf:man_unique_H.name=世界之主生成蛋
+item.spawn_egg.entity.sf:man_unique_h.name=僵尸生物蛋
+entity.sf:man_unique_h.name=僵尸

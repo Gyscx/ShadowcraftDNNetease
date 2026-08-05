@@ -179,11 +179,11 @@ class Scheduler:
         self.removeTask(TIMER_TASK, taskId)
 
 
-def addTimer(period, fn):
+def addTimer(period, fn, repeat=True):
     GameServer = compServer.CreateGame(serverApi.GetLevelId())
     GameClient = compClient.CreateGame(clientApi.GetLevelId())
     game = GameServer if isServer() else GameClient
-    return game.AddRepeatedTimer(period, fn)
+    return repeat and game.AddRepeatedTimer(period, fn) or game.AddTimer(period, fn)
 
 def cancelTimer(timer):
     GameServer = compServer.CreateGame(serverApi.GetLevelId())
@@ -193,13 +193,14 @@ def cancelTimer(timer):
 
 
 class TimerAdapter(object):
-    def __init__(self, period, fn):
+    def __init__(self, period, fn, repeat=True):
         self.period = period
+        self.repeat = repeat
         self.fn = fn
         self.timer = None
     
     def start(self):
-        self.timer = addTimer(self.period, self.fn)
+        self.timer = addTimer(self.period, self.fn, self.repeat)
 
     def cancel(self):
         if self.timer:
@@ -368,3 +369,35 @@ def Async(func):
         advance()
         return ftr
     return wrapper
+
+
+class _FrameBasedTimer(object):
+    manager = None
+
+    def __init__(self, duration, callback):
+        self.remains = duration
+        self.callback = callback
+        self.lastFrame = time()
+        if not _FrameBasedTimer.manager:
+            from .subsystem import SubsystemManager
+            _FrameBasedTimer.manager = SubsystemManager.getInstance()
+        self.taskId = _FrameBasedTimer.manager.tickSched.addTask(
+            SchedUpdateFlags.BeforeUpdate,
+            lambda: self._doTick()
+        )
+    
+    def _doTick(self):
+        cutTime = time()
+        dt = cutTime - self.lastFrame
+        self.lastFrame = cutTime
+        self.remains -= dt
+        if self.remains < 0:
+            _FrameBasedTimer.manager.tickSched.removeTask(SchedUpdateFlags.BeforeUpdate, self.taskId)
+            self.callback()
+
+
+def wait(sec):
+    # type: (float) -> Future
+    ftr, res, _ = Future.resolvers()
+    _FrameBasedTimer(sec, lambda: res())
+    return ftr
