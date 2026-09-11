@@ -30,6 +30,7 @@ ResponseEntityShadowDataEvent = "ResponseEntityShadowDataEvent"  # 服务器->�
 PlayerShadowEffectEvent = "PlayerShadowEffectEvent"  # 服务器->客户端：玩家特殊效果（抑制/充能）
 SetPlayerShadowEnergyEvent = "SetPlayerShadowEnergyEvent"  # 服务器->客户端：设置玩家暗影能量值
 ShadowSystemCommandEvent = "ShadowSystemCommandEvent"  # 命令事件：设置暗影能量
+TestRegisterMonsterEvent = "TestRegisterMonsterEvent"  # 测试事件：手动注册怪物
 
 shadowUIName = "shadow_energy"
 shadowUIPyClsPath = "dn_script_shadow.ui.shadowUI.ShadowScreenUI"

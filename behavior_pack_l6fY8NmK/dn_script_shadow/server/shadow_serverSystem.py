@@ -436,6 +436,10 @@ class ShadowServerSystem(ServerSubsystem):
                     logger.info("新实体 %s 初始化，暗影能量: 0" % entity_id_str)
 
                     self.NotifyClientToBindUI(entity_id)
+                    
+                    if identifier == "sf:man_unique_h":
+                        logger.info("[怪物AI] 检测到 sf:man_unique_h 生成，自动注册到AI系统")
+                        self.monster_ai.registerMonster(entity_id)
                 else:
                     logger.warning("实体 %s 已存在，跳过重复初始化" % entity_id_str)
             else:
@@ -511,6 +515,27 @@ class ShadowServerSystem(ServerSubsystem):
 
         except Exception as e:
             logger.error("PlayerHurtEvent error: %s" % str(e))
+
+    @CustomEvent(config.TestRegisterMonsterEvent)
+    def OnTestRegisterMonster(self, args):
+        """测试事件：手动注册怪物到AI系统
+        
+        通过代码触发：self.sendClient(player_id, config.TestRegisterMonsterEvent, {"entityId": monster_id})
+        """
+        try:
+            entity_id = args.entityId
+            
+            if entity_id:
+                entity_id_str = str(entity_id)
+                logger.info("[测试] 手动注册怪物: %s" % entity_id_str)
+                self.monster_ai.registerMonster(entity_id)
+                logger.info("[测试] 当前已注册怪物数量: %d" % len(self.monster_ai._registered_monsters))
+                logger.info("[测试] 当前状态树数量: %d" % len(self.monster_ai._state_trees))
+            
+        except Exception as e:
+            logger.error("[测试] OnTestRegisterMonster error: %s" % str(e))
+            import traceback
+            logger.error(traceback.format_exc())
 
     @CustomEvent(config.RequestEntityShadowDataEvent)
     def OnRequestEntityShadowData(self, args):

@@ -12,5 +12,3 @@ entity.sf:man_legendary_H.name=圆顶守护者
 item.spawn_egg.entity.sf:man_legendary_H.name=圆顶守护者生成蛋
 entity.sf:man_unique_H.name=世界之主
 item.spawn_egg.entity.sf:man_unique_H.name=世界之主生成蛋
-item.spawn_egg.entity.sf:man_unique_h.name=僵尸生物蛋
-entity.sf:man_unique_h.name=僵尸
